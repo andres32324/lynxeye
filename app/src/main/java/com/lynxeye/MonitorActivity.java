@@ -22,6 +22,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.RandomAccessFile;
+import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -33,35 +34,40 @@ import java.util.concurrent.TimeUnit;
 public class MonitorActivity extends AppCompatActivity {
 
     private static final int PORT_AUDIO = 9999;
-    private static final int PORT_VIDEO = 9998;
+    private static final int PORT_VIDEO  = 9998;
     private static final int SAMPLE_RATE = 44100;
     private static final int AUDIO_QUEUE_SIZE = 3;
-    private static final int VIDEO_QUEUE_SIZE = 2;
+    private static final int VIDEO_QUEUE_SIZE  = 2;
 
     private String deviceName, deviceIp;
 
-    private TextView tvStatus, tvDeviceName, tvRecTime;
-    private ImageView ivVideo;
+    private TextView   tvStatus, tvDeviceName, tvRecTime;
+    private ImageView  ivVideo;
     private ImageButton btnRecord, btnSwitchCam, btnEq;
-    private SeekBar seekVolume;
-    private View layoutEq;
+    private SeekBar    seekVolume;
+    private View       layoutEq;
 
     private AudioTrack audioTrack;
-    private Equalizer equalizer;
+    private Equalizer  equalizer;
 
-    private volatile boolean running = false;
-    private volatile boolean isRecording = false;
+    private volatile boolean running        = false;
+    private volatile boolean isRecording    = false;
+    private volatile boolean audioConnected = false;
+    private volatile boolean videoConnected = false;
+
+    // Keep last video frame visible when signal drops
+    private android.graphics.Bitmap lastFrame = null;
 
     private final BlockingQueue<byte[]> audioQueue = new ArrayBlockingQueue<>(AUDIO_QUEUE_SIZE);
     private final BlockingQueue<byte[]> videoQueue  = new ArrayBlockingQueue<>(VIDEO_QUEUE_SIZE);
 
     // Recording
-    private File currentRecordingFile;
-    private FileOutputStream recordingStream;
-    private long recordingStart;
-    private long totalAudioBytes = 0;
-    private Handler uiHandler = new Handler();
-    private Runnable recTimeUpdater;
+    private File              currentRecordingFile;
+    private FileOutputStream  recordingStream;
+    private long              recordingStart;
+    private long              totalAudioBytes = 0;
+    private Handler           uiHandler = new Handler();
+    private Runnable          recTimeUpdater;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -97,6 +103,26 @@ public class MonitorActivity extends AppCompatActivity {
         startVideoRenderer();
     }
 
+    // ─── STATUS ───────────────────────────────────────────
+    private void updateStatus() {
+        runOnUiThread(() -> {
+            if (audioConnected || videoConnected) {
+                tvStatus.setText("⬤  CONNECTED");
+                tvStatus.setTextColor(0xFF00E676);
+            } else {
+                tvStatus.setText("⬤  LOST SIGNAL");
+                tvStatus.setTextColor(0xFFFF3D3D);
+            }
+        });
+    }
+
+    private void setStatus(String text, int color) {
+        runOnUiThread(() -> {
+            tvStatus.setText("⬤  " + text);
+            tvStatus.setTextColor(color);
+        });
+    }
+
     // ─── AUDIO TRACK ──────────────────────────────────────
     private void setupAudioTrack() {
         int minBuf = AudioTrack.getMinBufferSize(SAMPLE_RATE,
@@ -125,32 +151,39 @@ public class MonitorActivity extends AppCompatActivity {
     private void startAudioReceiver() {
         new Thread(() -> {
             while (running) {
+                Socket socket = null;
                 try {
-                    Socket socket = new Socket(deviceIp, PORT_AUDIO);
+                    socket = new Socket();
+                    socket.connect(new InetSocketAddress(deviceIp, PORT_AUDIO), 5000);
                     socket.setTcpNoDelay(true);
-                    socket.setSoTimeout(4000);
+                    socket.setSoTimeout(10000);
+                    socket.setKeepAlive(true);
                     InputStream in = socket.getInputStream();
                     byte[] buffer = new byte[2048];
 
-                    setStatus("CONNECTED", 0xFF00E676);
+                    audioConnected = true;
+                    updateStatus();
 
-                    while (running && !socket.isClosed()) {
+                    while (running && socket.isConnected() && !socket.isClosed()) {
                         int read = in.read(buffer, 0, buffer.length);
+                        if (read < 0) break;
                         if (read > 0) {
                             byte[] chunk = new byte[read];
                             System.arraycopy(buffer, 0, chunk, 0, read);
-                            // Drop oldest if full → no lag buildup
                             if (!audioQueue.offer(chunk)) {
                                 audioQueue.poll();
                                 audioQueue.offer(chunk);
                             }
                         }
                     }
-                    socket.close();
                 } catch (Exception e) {
-                    setStatus("LOST SIGNAL", 0xFFFF3D3D);
+                    // silent reconnect
+                } finally {
+                    audioConnected = false;
+                    updateStatus();
                     audioQueue.clear();
-                    try { Thread.sleep(1500); } catch (InterruptedException ie) { break; }
+                    if (socket != null) try { socket.close(); } catch (Exception ignored) {}
+                    if (running) try { Thread.sleep(2000); } catch (InterruptedException ie) { break; }
                 }
             }
         }, "AudioReceiver").start();
@@ -164,7 +197,6 @@ public class MonitorActivity extends AppCompatActivity {
                     byte[] chunk = audioQueue.poll(500, TimeUnit.MILLISECONDS);
                     if (chunk != null) {
                         audioTrack.write(chunk, 0, chunk.length);
-                        // Write raw PCM to recording file
                         if (isRecording && recordingStream != null) {
                             try {
                                 recordingStream.write(chunk, 0, chunk.length);
@@ -181,12 +213,19 @@ public class MonitorActivity extends AppCompatActivity {
     private void startVideoReceiver() {
         new Thread(() -> {
             while (running) {
+                Socket socket = null;
                 try {
-                    Socket socket = new Socket(deviceIp, PORT_VIDEO);
+                    socket = new Socket();
+                    socket.connect(new InetSocketAddress(deviceIp, PORT_VIDEO), 5000);
                     socket.setTcpNoDelay(true);
+                    socket.setSoTimeout(10000);
+                    socket.setKeepAlive(true);
                     DataInputStream in = new DataInputStream(socket.getInputStream());
 
-                    while (running && !socket.isClosed()) {
+                    videoConnected = true;
+                    updateStatus();
+
+                    while (running && socket.isConnected() && !socket.isClosed()) {
                         int len = in.readInt();
                         if (len <= 0 || len > 3_000_000) continue;
 
@@ -197,16 +236,19 @@ public class MonitorActivity extends AppCompatActivity {
                             if (r < 0) break;
                             total += r;
                         }
-                        // Always show latest frame only
                         if (!videoQueue.offer(frame)) {
                             videoQueue.poll();
                             videoQueue.offer(frame);
                         }
                     }
-                    socket.close();
                 } catch (Exception e) {
+                    // silent reconnect
+                } finally {
+                    videoConnected = false;
+                    updateStatus();
                     videoQueue.clear();
-                    try { Thread.sleep(1500); } catch (InterruptedException ie) { break; }
+                    if (socket != null) try { socket.close(); } catch (Exception ignored) {}
+                    if (running) try { Thread.sleep(2000); } catch (InterruptedException ie) { break; }
                 }
             }
         }, "VideoReceiver").start();
@@ -221,9 +263,16 @@ public class MonitorActivity extends AppCompatActivity {
                     if (frame != null) {
                         android.graphics.BitmapFactory.Options opts = new android.graphics.BitmapFactory.Options();
                         opts.inPreferredConfig = android.graphics.Bitmap.Config.RGB_565;
-                        final android.graphics.Bitmap bmp =
+                        android.graphics.Bitmap bmp =
                                 android.graphics.BitmapFactory.decodeByteArray(frame, 0, frame.length, opts);
-                        if (bmp != null) runOnUiThread(() -> ivVideo.setImageBitmap(bmp));
+                        if (bmp != null) {
+                            lastFrame = bmp;
+                            runOnUiThread(() -> ivVideo.setImageBitmap(bmp));
+                        }
+                    } else if (lastFrame != null) {
+                        // Keep last frame visible - don't clear on signal loss
+                        final android.graphics.Bitmap keep = lastFrame;
+                        runOnUiThread(() -> ivVideo.setImageBitmap(keep));
                     }
                 } catch (InterruptedException e) { break; }
             }
@@ -235,18 +284,17 @@ public class MonitorActivity extends AppCompatActivity {
         try {
             equalizer = new Equalizer(0, audioTrack.getAudioSessionId());
             equalizer.setEnabled(true);
-            int[] seekIds  = {R.id.seekBand0, R.id.seekBand1, R.id.seekBand2, R.id.seekBand3, R.id.seekBand4};
-            int[] labelIds = {R.id.tvBand0,   R.id.tvBand1,   R.id.tvBand2,   R.id.tvBand3,   R.id.tvBand4};
-            String[] labels = {"60Hz", "230Hz", "910Hz", "3.6kHz", "14kHz"};
-            short[] range = equalizer.getBandLevelRange();
+            int[]    seekIds  = {R.id.seekBand0,R.id.seekBand1,R.id.seekBand2,R.id.seekBand3,R.id.seekBand4};
+            int[]    labelIds = {R.id.tvBand0,  R.id.tvBand1,  R.id.tvBand2,  R.id.tvBand3,  R.id.tvBand4};
+            String[] labels   = {"60Hz","230Hz","910Hz","3.6kHz","14kHz"};
+            short[]  range    = equalizer.getBandLevelRange();
             short min = range[0], max = range[1];
             for (int i = 0; i < 5 && i < equalizer.getNumberOfBands(); i++) {
                 ((TextView) findViewById(labelIds[i])).setText(labels[i]);
                 SeekBar sb = findViewById(seekIds[i]);
                 sb.setMax(max - min);
                 sb.setProgress(equalizer.getBandLevel((short) i) - min);
-                final int band = i;
-                final short bMin = min;
+                final int band = i; final short bMin = min;
                 sb.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
                     @Override public void onProgressChanged(SeekBar s, int p, boolean u) {
                         equalizer.setBandLevel((short) band, (short)(p + bMin));
@@ -279,49 +327,39 @@ public class MonitorActivity extends AppCompatActivity {
             if (isRecording) stopRecording();
             else startRecording();
         });
-
         btnSwitchCam.setOnClickListener(v ->
                 Toast.makeText(this, "Coming soon", Toast.LENGTH_SHORT).show());
-
         btnEq.setOnClickListener(v ->
                 layoutEq.setVisibility(
                         layoutEq.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE));
     }
 
-    // ─── RECORDING (WAV) ──────────────────────────────────
-    // Saves proper WAV file with header — plays in any app
+    // ─── RECORDING WAV ────────────────────────────────────
     private void startRecording() {
         try {
             File dir = new File(Environment.getExternalStorageDirectory(), "LynxEye/Recordings");
             if (!dir.exists()) dir.mkdirs();
-
             String filename = "LynxEye_" +
                     new SimpleDateFormat("yyyy-MM-dd_HH-mm", Locale.getDefault()).format(new Date()) + ".wav";
             currentRecordingFile = new File(dir, filename);
             recordingStream = new FileOutputStream(currentRecordingFile);
-
-            // Write placeholder WAV header — will be updated when recording stops
             writeWavHeader(recordingStream, 0);
-
             totalAudioBytes = 0;
             isRecording = true;
             recordingStart = System.currentTimeMillis();
-
             btnRecord.setImageResource(android.R.drawable.ic_media_pause);
             tvRecTime.setVisibility(View.VISIBLE);
-
             recTimeUpdater = new Runnable() {
                 @Override public void run() {
                     long s = (System.currentTimeMillis() - recordingStart) / 1000;
-                    tvRecTime.setText(String.format(Locale.getDefault(), "⏺ %02d:%02d", s / 60, s % 60));
+                    tvRecTime.setText(String.format(Locale.getDefault(), "⏺ %02d:%02d", s/60, s%60));
                     if (isRecording) uiHandler.postDelayed(this, 1000);
                 }
             };
             uiHandler.post(recTimeUpdater);
             Toast.makeText(this, "Recording started", Toast.LENGTH_SHORT).show();
-
         } catch (Exception e) {
-            Toast.makeText(this, "Error starting recording: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_LONG).show();
         }
     }
 
@@ -330,74 +368,40 @@ public class MonitorActivity extends AppCompatActivity {
         uiHandler.removeCallbacks(recTimeUpdater);
         tvRecTime.setVisibility(View.GONE);
         btnRecord.setImageResource(android.R.drawable.ic_btn_speak_now);
-
         try {
-            if (recordingStream != null) {
-                recordingStream.flush();
-                recordingStream.close();
-                recordingStream = null;
-            }
-            // Update WAV header with correct file size
-            if (currentRecordingFile != null && currentRecordingFile.exists()) {
+            if (recordingStream != null) { recordingStream.flush(); recordingStream.close(); recordingStream = null; }
+            if (currentRecordingFile != null && currentRecordingFile.exists())
                 updateWavHeader(currentRecordingFile, totalAudioBytes);
-                Toast.makeText(this, "Saved: " + currentRecordingFile.getName(), Toast.LENGTH_LONG).show();
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+            Toast.makeText(this, "Saved: " + (currentRecordingFile != null ? currentRecordingFile.getName() : ""), Toast.LENGTH_LONG).show();
+        } catch (Exception e) { e.printStackTrace(); }
     }
 
-    // Write a 44-byte WAV header
     private void writeWavHeader(FileOutputStream out, long audioBytes) throws IOException {
-        long totalSize = audioBytes + 36;
-        byte[] header = new byte[44];
-        // RIFF chunk
-        header[0]='R'; header[1]='I'; header[2]='F'; header[3]='F';
-        header[4]=(byte)(totalSize);       header[5]=(byte)(totalSize>>8);
-        header[6]=(byte)(totalSize>>16);   header[7]=(byte)(totalSize>>24);
-        header[8]='W'; header[9]='A'; header[10]='V'; header[11]='E';
-        // fmt chunk
-        header[12]='f'; header[13]='m'; header[14]='t'; header[15]=' ';
-        header[16]=16; header[17]=0; header[18]=0; header[19]=0; // chunk size
-        header[20]=1; header[21]=0;  // PCM format
-        header[22]=1; header[23]=0;  // mono
-        // sample rate 44100
-        header[24]=(byte)(SAMPLE_RATE);       header[25]=(byte)(SAMPLE_RATE>>8);
-        header[26]=(byte)(SAMPLE_RATE>>16);   header[27]=(byte)(SAMPLE_RATE>>24);
-        // byte rate = sampleRate * channels * bitsPerSample/8
-        long byteRate = SAMPLE_RATE * 2L;
-        header[28]=(byte)(byteRate);       header[29]=(byte)(byteRate>>8);
-        header[30]=(byte)(byteRate>>16);   header[31]=(byte)(byteRate>>24);
-        header[32]=2; header[33]=0;  // block align
-        header[34]=16; header[35]=0; // bits per sample
-        // data chunk
-        header[36]='d'; header[37]='a'; header[38]='t'; header[39]='a';
-        header[40]=(byte)(audioBytes);       header[41]=(byte)(audioBytes>>8);
-        header[42]=(byte)(audioBytes>>16);   header[43]=(byte)(audioBytes>>24);
-        out.write(header);
+        long total = audioBytes + 36;
+        byte[] h = new byte[44];
+        h[0]='R';h[1]='I';h[2]='F';h[3]='F';
+        h[4]=(byte)total;h[5]=(byte)(total>>8);h[6]=(byte)(total>>16);h[7]=(byte)(total>>24);
+        h[8]='W';h[9]='A';h[10]='V';h[11]='E';
+        h[12]='f';h[13]='m';h[14]='t';h[15]=' ';
+        h[16]=16;h[17]=0;h[18]=0;h[19]=0;
+        h[20]=1;h[21]=0; h[22]=1;h[23]=0;
+        h[24]=(byte)SAMPLE_RATE;h[25]=(byte)(SAMPLE_RATE>>8);h[26]=(byte)(SAMPLE_RATE>>16);h[27]=(byte)(SAMPLE_RATE>>24);
+        long br=SAMPLE_RATE*2L;
+        h[28]=(byte)br;h[29]=(byte)(br>>8);h[30]=(byte)(br>>16);h[31]=(byte)(br>>24);
+        h[32]=2;h[33]=0; h[34]=16;h[35]=0;
+        h[36]='d';h[37]='a';h[38]='t';h[39]='a';
+        h[40]=(byte)audioBytes;h[41]=(byte)(audioBytes>>8);h[42]=(byte)(audioBytes>>16);h[43]=(byte)(audioBytes>>24);
+        out.write(h);
     }
 
-    // Go back and fix the WAV header with real sizes
     private void updateWavHeader(File file, long audioBytes) throws IOException {
         RandomAccessFile raf = new RandomAccessFile(file, "rw");
-        long totalSize = audioBytes + 36;
-        // Update RIFF chunk size
+        long total = audioBytes + 36;
         raf.seek(4);
-        raf.write((byte)(totalSize));      raf.write((byte)(totalSize>>8));
-        raf.write((byte)(totalSize>>16));  raf.write((byte)(totalSize>>24));
-        // Update data chunk size
+        raf.write((byte)total);raf.write((byte)(total>>8));raf.write((byte)(total>>16));raf.write((byte)(total>>24));
         raf.seek(40);
-        raf.write((byte)(audioBytes));     raf.write((byte)(audioBytes>>8));
-        raf.write((byte)(audioBytes>>16)); raf.write((byte)(audioBytes>>24));
+        raf.write((byte)audioBytes);raf.write((byte)(audioBytes>>8));raf.write((byte)(audioBytes>>16));raf.write((byte)(audioBytes>>24));
         raf.close();
-    }
-
-    // ─── HELPERS ──────────────────────────────────────────
-    private void setStatus(String text, int color) {
-        runOnUiThread(() -> {
-            tvStatus.setText("⬤  " + text);
-            tvStatus.setTextColor(color);
-        });
     }
 
     @Override
