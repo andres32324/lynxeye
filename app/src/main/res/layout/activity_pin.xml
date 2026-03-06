@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#0A0A0A"
+    android:gravity="center"
+    android:padding="32dp">
+
+    <!-- Eye icon -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="👁"
+        android:textSize="48sp"
+        android:layout_marginBottom="8dp"/>
+
+    <!-- App title -->
+    <TextView
+        android:id="@+id/tvTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="LYNXEYE"
+        android:textSize="28sp"
+        android:textColor="#00E676"
+        android:textStyle="bold"
+        android:fontFamily="monospace"
+        android:letterSpacing="0.3"
+        android:layout_marginBottom="4dp"/>
+
+    <TextView
+        android:id="@+id/tvSubtitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="ENTER PIN"
+        android:textSize="12sp"
+        android:textColor="#00E676"
+        android:fontFamily="monospace"
+        android:letterSpacing="0.2"
+        android:layout_marginBottom="40dp"/>
+
+    <!-- PIN dots -->
+    <TextView
+        android:id="@+id/tvDots"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="○  ○  ○  ○  ○  ○"
+        android:textSize="28sp"
+        android:textColor="#00E676"
+        android:fontFamily="monospace"
+        android:layout_marginBottom="8dp"/>
+
+    <TextView
+        android:id="@+id/tvAttempts"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="3 ATTEMPTS REMAINING"
+        android:textSize="10sp"
+        android:textColor="#555555"
+        android:fontFamily="monospace"
+        android:layout_marginBottom="40dp"/>
+
+    <!-- Numpad -->
+    <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="vertical">
+
+        <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginBottom="12dp">
+            <TextView android:id="@+id/btn1" android:layout_width="72dp" android:layout_height="72dp" android:text="1" android:gravity="center" android:textSize="22sp" android:textColor="#00E676" android:fontFamily="monospace" android:background="@drawable/btn_numpad" android:layout_marginEnd="12dp"/>
+            <TextView android:id="@+id/btn2" android:layout_width="72dp" android:layout_height="72dp" android:text="2" android:gravity="center" android:textSize="22sp" android:textColor="#00E676" android:fontFamily="monospace" android:background="@drawable/btn_numpad" android:layout_marginEnd="12dp"/>
+            <TextView android:id="@+id/btn3" android:layout_width="72dp" android:layout_height="72dp" android:text="3" android:gravity="center" android:textSize="22sp" android:textColor="#00E676" android:fontFamily="monospace" android:background="@drawable/btn_numpad"/>
+        </LinearLayout>
+
+        <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginBottom="12dp">
+            <TextView android:id="@+id/btn4" android:layout_width="72dp" android:layout_height="72dp" android:text="4" android:gravity="center" android:textSize="22sp" android:textColor="#00E676" android:fontFamily="monospace" android:background="@drawable/btn_numpad" android:layout_marginEnd="12dp"/>
+            <TextView android:id="@+id/btn5" android:layout_width="72dp" android:layout_height="72dp" android:text="5" android:gravity="center" android:textSize="22sp" android:textColor="#00E676" android:fontFamily="monospace" android:background="@drawable/btn_numpad" android:layout_marginEnd="12dp"/>
+            <TextView android:id="@+id/btn6" android:layout_width="72dp" android:layout_height="72dp" android:text="6" android:gravity="center" android:textSize="22sp" android:textColor="#00E676" android:fontFamily="monospace" android:background="@drawable/btn_numpad"/>
+        </LinearLayout>
+
+        <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginBottom="12dp">
+            <TextView android:id="@+id/btn7" android:layout_width="72dp" android:layout_height="72dp" android:text="7" android:gravity="center" android:textSize="22sp" android:textColor="#00E676" android:fontFamily="monospace" android:background="@drawable/btn_numpad" android:layout_marginEnd="12dp"/>
+            <TextView android:id="@+id/btn8" android:layout_width="72dp" android:layout_height="72dp" android:text="8" android:gravity="center" android:textSize="22sp" android:textColor="#00E676" android:fontFamily="monospace" android:background="@drawable/btn_numpad" android:layout_marginEnd="12dp"/>
+            <TextView android:id="@+id/btn9" android:layout_width="72dp" android:layout_height="72dp" android:text="9" android:gravity="center" android:textSize="22sp" android:textColor="#00E676" android:fontFamily="monospace" android:background="@drawable/btn_numpad"/>
+        </LinearLayout>
+
+        <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center">
+            <View android:layout_width="72dp" android:layout_height="72dp" android:layout_marginEnd="12dp"/>
+            <TextView android:id="@+id/btn0" android:layout_width="72dp" android:layout_height="72dp" android:text="0" android:gravity="center" android:textSize="22sp" android:textColor="#00E676" android:fontFamily="monospace" android:background="@drawable/btn_numpad" android:layout_marginEnd="12dp"/>
+            <ImageButton android:id="@+id/btnDelete" android:layout_width="72dp" android:layout_height="72dp" android:src="@android:drawable/ic_menu_delete" android:background="@drawable/btn_numpad" android:tint="#00E676"/>
+        </LinearLayout>
+
+    </LinearLayout>
+
+</LinearLayout>

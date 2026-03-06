@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="#111111"
+    android:padding="20dp">
+
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Name" android:textColor="#00E676" android:textSize="11sp" android:fontFamily="monospace" android:layout_marginBottom="4dp"/>
+    <EditText android:id="@+id/etName" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="e.g. Sala" android:textColor="#FFFFFF" android:textColorHint="#333333" android:backgroundTint="#00E676" android:fontFamily="monospace" android:layout_marginBottom="16dp"/>
+
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="IP Address" android:textColor="#00E676" android:textSize="11sp" android:fontFamily="monospace" android:layout_marginBottom="4dp"/>
+    <EditText android:id="@+id/etIp" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="192.168.1.x or 100.x.x.x" android:textColor="#FFFFFF" android:textColorHint="#333333" android:backgroundTint="#00E676" android:fontFamily="monospace" android:inputType="text" android:layout_marginBottom="16dp"/>
+
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Pairing Code" android:textColor="#00E676" android:textSize="11sp" android:fontFamily="monospace" android:layout_marginBottom="4dp"/>
+    <EditText android:id="@+id/etCode" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="e.g. CC431A" android:textColor="#FFFFFF" android:textColorHint="#333333" android:backgroundTint="#00E676" android:fontFamily="monospace" android:inputType="textCapCharacters"/>
+
+</LinearLayout>

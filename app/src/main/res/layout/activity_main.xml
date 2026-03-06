@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#0A0A0A">
+
+    <!-- Header -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="20dp"
+        android:gravity="center_vertical">
+
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="👁  LYNXEYE"
+                android:textSize="22sp"
+                android:textColor="#00E676"
+                android:textStyle="bold"
+                android:fontFamily="monospace"/>
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="SURVEILLANCE SYSTEM"
+                android:textSize="10sp"
+                android:textColor="#335544"
+                android:fontFamily="monospace"
+                android:letterSpacing="0.2"/>
+        </LinearLayout>
+
+        <ImageButton
+            android:id="@+id/btnSettings"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:src="@android:drawable/ic_menu_preferences"
+            android:background="@drawable/btn_icon"
+            android:tint="#00E676"
+            android:layout_marginEnd="8dp"/>
+
+        <ImageButton
+            android:id="@+id/btnAdd"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:src="@android:drawable/ic_input_add"
+            android:background="@drawable/btn_icon"
+            android:tint="#00E676"/>
+    </LinearLayout>
+
+    <!-- Divider -->
+    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#1A2E1A"/>
+
+    <!-- Section title -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="DEVICES"
+        android:textSize="11sp"
+        android:textColor="#00E676"
+        android:fontFamily="monospace"
+        android:letterSpacing="0.3"
+        android:paddingStart="20dp"
+        android:paddingTop="16dp"
+        android:paddingBottom="8dp"/>
+
+    <!-- Device list -->
+    <ListView
+        android:id="@+id/listDevices"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:divider="#1A2E1A"
+        android:dividerHeight="1dp"
+        android:listSelector="@android:color/transparent"/>
+
+    <!-- Empty state -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="No devices saved\nTap + to add a device"
+        android:textColor="#333333"
+        android:fontFamily="monospace"
+        android:textSize="13sp"
+        android:gravity="center"
+        android:padding="40dp"/>
+
+</LinearLayout>
