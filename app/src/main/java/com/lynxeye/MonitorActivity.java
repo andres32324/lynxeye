@@ -43,8 +43,7 @@ public class MonitorActivity extends AppCompatActivity {
 
     private TextView    tvStatus, tvDeviceName, tvRecTime;
     private ImageView   ivVideo;
-    private ImageButton btnRecord, btnSwitchCam;
-    private android.widget.Button btnEq;
+    private ImageButton btnRecord, btnSwitchCam, btnEq;
     private SeekBar     seekVolume;
     private View        layoutEq;
 
@@ -286,8 +285,22 @@ public class MonitorActivity extends AppCompatActivity {
 
     private void setupButtons() {
         btnRecord.setOnClickListener(v -> { if (isRecording) stopRecording(); else startRecording(); });
-        btnSwitchCam.setOnClickListener(v ->
-                Toast.makeText(this, "Coming soon", Toast.LENGTH_SHORT).show());
+
+        btnSwitchCam.setOnClickListener(v -> {
+            new Thread(() -> {
+                try {
+                    Socket cmd = new Socket();
+                    cmd.connect(new InetSocketAddress(deviceIp, 9997), 2000);
+                    cmd.getOutputStream().write("SWITCH_CAM\n".getBytes());
+                    cmd.getOutputStream().flush();
+                    cmd.close();
+                    runOnUiThread(() -> Toast.makeText(MonitorActivity.this, "Cámara cambiada", Toast.LENGTH_SHORT).show());
+                } catch (Exception e) {
+                    runOnUiThread(() -> Toast.makeText(MonitorActivity.this, "Error al cambiar cámara", Toast.LENGTH_SHORT).show());
+                }
+            }).start();
+        });
+
         btnEq.setOnClickListener(v ->
                 layoutEq.setVisibility(layoutEq.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE));
     }
