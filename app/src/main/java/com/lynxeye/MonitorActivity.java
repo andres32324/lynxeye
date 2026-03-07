@@ -108,9 +108,9 @@ public class MonitorActivity extends AppCompatActivity {
         if (videoEnabled) {
             startVideoReceiver();
             startVideoRenderer();
+            ivVideo.setBackgroundColor(0xFF111111);
         } else {
-            ivVideo.setImageResource(android.R.drawable.ic_menu_camera);
-            setStatus("AUDIO ONLY", 0xFF00E676);
+            ivVideo.setBackgroundColor(0xFF0A1A0A);
         }
     }
 
@@ -323,11 +323,22 @@ public class MonitorActivity extends AppCompatActivity {
             AppSettings.setVideoEnabled(this, newVal);
             sendCommand(newVal ? "VIDEO_ON" : "VIDEO_OFF");
             btnVideoToggle.setColorFilter(newVal ? 0xFF00E676 : 0xFFFF3D3D);
-            if (!newVal) ivVideo.setImageResource(android.R.drawable.ic_menu_camera);
+            if (!newVal) {
+                ivVideo.setImageBitmap(null);
+                ivVideo.setBackgroundColor(0xFF0A1A0A); // dark green
+            } else {
+                ivVideo.setBackgroundColor(0xFF111111);
+                // Restart video receiver
+                startVideoReceiver();
+                startVideoRenderer();
+            }
         });
 
         // Set initial color based on setting
         btnVideoToggle.setColorFilter(AppSettings.isVideoEnabled(this) ? 0xFF00E676 : 0xFFFF3D3D);
+        if (!AppSettings.isVideoEnabled(this)) {
+            ivVideo.setBackgroundColor(0xFF0A1A0A);
+        }
 
         btnScreenshot.setOnClickListener(v -> takeScreenshot());
 
