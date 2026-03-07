@@ -1,56 +1,139 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="#0A0A0A">
+
+<LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:background="#0A0A0A"
     android:padding="20dp">
 
-    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginBottom="24dp">
-        <TextView android:id="@+id/btnBack" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="←" android:textSize="22sp" android:textColor="#00E676" android:layout_marginEnd="16dp"/>
-        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="SETTINGS" android:textSize="18sp" android:textColor="#00E676" android:fontFamily="monospace" android:letterSpacing="0.2"/>
+    <!-- Header -->
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginBottom="24dp">
+        <TextView android:id="@+id/btnBack" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="←" android:textSize="22sp" android:textColor="#00E676" android:layout_marginEnd="16dp"/>
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="SETTINGS" android:textSize="18sp" android:textColor="#00E676" android:fontFamily="monospace" android:letterSpacing="0.2"/>
     </LinearLayout>
 
-    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="AUDIO" android:textSize="10sp" android:textColor="#00E676" android:fontFamily="monospace" android:letterSpacing="0.3" android:layout_marginBottom="12dp"/>
+    <!-- VIDEO -->
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:text="VIDEO" android:textSize="10sp" android:textColor="#00E676"
+        android:fontFamily="monospace" android:letterSpacing="0.3" android:layout_marginBottom="12dp"/>
+
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="horizontal" android:gravity="center_vertical"
+        android:background="@drawable/card_dark" android:padding="16dp" android:layout_marginBottom="24dp">
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+            android:layout_weight="1" android:orientation="vertical">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="Enable video" android:textColor="#FFFFFF" android:textSize="14sp"/>
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="Disable to save battery and bandwidth" android:textColor="#555555"
+                android:textSize="11sp" android:fontFamily="monospace"/>
+        </LinearLayout>
+        <Switch android:id="@+id/swVideo" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+    </LinearLayout>
+
+    <!-- AUDIO -->
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:text="AUDIO" android:textSize="10sp" android:textColor="#00E676"
+        android:fontFamily="monospace" android:letterSpacing="0.3" android:layout_marginBottom="12dp"/>
 
     <!-- Mix audio -->
-    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:background="@drawable/card_dark" android:padding="16dp" android:layout_marginBottom="8dp">
-        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Mix with other apps" android:textColor="#FFFFFF" android:textSize="14sp"/>
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Continue when another app plays audio" android:textColor="#555555" android:textSize="11sp" android:fontFamily="monospace"/>
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="horizontal" android:gravity="center_vertical"
+        android:background="@drawable/card_dark" android:padding="16dp" android:layout_marginBottom="8dp">
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+            android:layout_weight="1" android:orientation="vertical">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="Mix with other apps" android:textColor="#FFFFFF" android:textSize="14sp"/>
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="Continue when another app plays audio" android:textColor="#555555"
+                android:textSize="11sp" android:fontFamily="monospace"/>
         </LinearLayout>
         <Switch android:id="@+id/swMixAudio" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
     </LinearLayout>
 
-    <!-- Opus codec -->
-    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:background="@drawable/card_dark" android:padding="16dp" android:layout_marginBottom="8dp">
-        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Opus codec" android:textColor="#FFFFFF" android:textSize="14sp"/>
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Better quality, less bandwidth" android:textColor="#555555" android:textSize="11sp" android:fontFamily="monospace"/>
-        </LinearLayout>
-        <Switch android:id="@+id/swOpus" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+    <!-- Audio mode -->
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" android:background="@drawable/card_dark"
+        android:padding="16dp" android:layout_marginBottom="8dp">
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="Audio mode" android:textColor="#FFFFFF" android:textSize="14sp"
+            android:layout_marginBottom="12dp"/>
+        <RadioGroup android:id="@+id/rgAudioMode" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:orientation="vertical">
+            <RadioButton android:id="@+id/rbNormal" android:layout_width="wrap_content"
+                android:layout_height="wrap_content" android:text="Normal  —  mono, low data"
+                android:textColor="#AAAAAA" android:textSize="12sp" android:fontFamily="monospace"
+                android:buttonTint="#00E676"/>
+            <RadioButton android:id="@+id/rbHighQuality" android:layout_width="wrap_content"
+                android:layout_height="wrap_content" android:text="High quality  —  stereo, FL Studio ready"
+                android:textColor="#AAAAAA" android:textSize="12sp" android:fontFamily="monospace"
+                android:buttonTint="#00E676" android:layout_marginTop="8dp"/>
+            <RadioButton android:id="@+id/rbLowBandwidth" android:layout_width="wrap_content"
+                android:layout_height="wrap_content" android:text="Low bandwidth  —  mono, saves data"
+                android:textColor="#AAAAAA" android:textSize="12sp" android:fontFamily="monospace"
+                android:buttonTint="#00E676" android:layout_marginTop="8dp"/>
+        </RadioGroup>
+    </LinearLayout>
+
+    <!-- Sample rate -->
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" android:background="@drawable/card_dark"
+        android:padding="16dp" android:layout_marginBottom="8dp">
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="Sample rate" android:textColor="#FFFFFF" android:textSize="14sp"
+            android:layout_marginBottom="12dp"/>
+        <RadioGroup android:id="@+id/rgSampleRate" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:orientation="vertical">
+            <RadioButton android:id="@+id/rb44100" android:layout_width="wrap_content"
+                android:layout_height="wrap_content" android:text="44100 Hz  —  standard"
+                android:textColor="#AAAAAA" android:textSize="12sp" android:fontFamily="monospace"
+                android:buttonTint="#00E676"/>
+            <RadioButton android:id="@+id/rb48000" android:layout_width="wrap_content"
+                android:layout_height="wrap_content" android:text="48000 Hz  —  professional"
+                android:textColor="#AAAAAA" android:textSize="12sp" android:fontFamily="monospace"
+                android:buttonTint="#00E676" android:layout_marginTop="8dp"/>
+            <RadioButton android:id="@+id/rb22050" android:layout_width="wrap_content"
+                android:layout_height="wrap_content" android:text="22050 Hz  —  medium"
+                android:textColor="#AAAAAA" android:textSize="12sp" android:fontFamily="monospace"
+                android:buttonTint="#00E676" android:layout_marginTop="8dp"/>
+            <RadioButton android:id="@+id/rb16000" android:layout_width="wrap_content"
+                android:layout_height="wrap_content" android:text="16000 Hz  —  voice"
+                android:textColor="#AAAAAA" android:textSize="12sp" android:fontFamily="monospace"
+                android:buttonTint="#00E676" android:layout_marginTop="8dp"/>
+        </RadioGroup>
     </LinearLayout>
 
     <!-- Noise suppression -->
-    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:background="@drawable/card_dark" android:padding="16dp" android:layout_marginBottom="24dp">
-        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Noise suppression" android:textColor="#FFFFFF" android:textSize="14sp"/>
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Reduce background noise" android:textColor="#555555" android:textSize="11sp" android:fontFamily="monospace"/>
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="horizontal" android:gravity="center_vertical"
+        android:background="@drawable/card_dark" android:padding="16dp" android:layout_marginBottom="24dp">
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+            android:layout_weight="1" android:orientation="vertical">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="Noise suppression" android:textColor="#FFFFFF" android:textSize="14sp"/>
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="Reduce background noise" android:textColor="#555555"
+                android:textSize="11sp" android:fontFamily="monospace"/>
         </LinearLayout>
         <Switch android:id="@+id/swNoise" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
     </LinearLayout>
 
-    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="SECURITY" android:textSize="10sp" android:textColor="#00E676" android:fontFamily="monospace" android:letterSpacing="0.3" android:layout_marginBottom="12dp"/>
+    <!-- SECURITY -->
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:text="SECURITY" android:textSize="10sp" android:textColor="#00E676"
+        android:fontFamily="monospace" android:letterSpacing="0.3" android:layout_marginBottom="12dp"/>
 
-    <TextView
-        android:id="@+id/btnChangePin"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Change PIN"
-        android:textColor="#00E676"
-        android:textSize="14sp"
-        android:fontFamily="monospace"
-        android:background="@drawable/card_dark"
-        android:padding="16dp"/>
+    <TextView android:id="@+id/btnChangePin"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:text="Change PIN" android:textColor="#00E676" android:textSize="14sp"
+        android:fontFamily="monospace" android:background="@drawable/card_dark" android:padding="16dp"/>
 
 </LinearLayout>
+</ScrollView>

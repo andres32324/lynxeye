@@ -1,6 +1,8 @@
 package com.lynxeye;
 
 import android.os.Bundle;
+import android.widget.RadioButton;
+import android.widget.RadioGroup;
 import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -13,22 +15,67 @@ public class SettingsActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_settings);
 
-        Switch swMixAudio   = findViewById(R.id.swMixAudio);
-        Switch swOpus       = findViewById(R.id.swOpus);
-        Switch swNoise      = findViewById(R.id.swNoise);
-        TextView btnChangePin = findViewById(R.id.btnChangePin);
-        TextView btnBack    = findViewById(R.id.btnBack);
+        Switch swMixAudio  = findViewById(R.id.swMixAudio);
+        Switch swNoise     = findViewById(R.id.swNoise);
+        Switch swVideo     = findViewById(R.id.swVideo);
+        RadioGroup rgAudioMode   = findViewById(R.id.rgAudioMode);
+        RadioGroup rgSampleRate  = findViewById(R.id.rgSampleRate);
+        TextView btnChangePin    = findViewById(R.id.btnChangePin);
+        TextView btnBack         = findViewById(R.id.btnBack);
 
+        // Load current values
         swMixAudio.setChecked(AppSettings.isMixAudio(this));
-        swOpus.setChecked(AppSettings.isOpusCodec(this));
         swNoise.setChecked(AppSettings.isNoiseSuppression(this));
+        swVideo.setChecked(AppSettings.isVideoEnabled(this));
 
-        swMixAudio.setOnCheckedChangeListener((v, checked) -> AppSettings.setMixAudio(this, checked));
-        swOpus.setOnCheckedChangeListener((v, checked) -> {
-            AppSettings.setOpusCodec(this, checked);
-            if (checked) Toast.makeText(this, "Opus active on next connection", Toast.LENGTH_SHORT).show();
+        // Audio mode
+        int mode = AppSettings.getAudioMode(this);
+        if (mode == 1) rgAudioMode.check(R.id.rbHighQuality);
+        else if (mode == 2) rgAudioMode.check(R.id.rbLowBandwidth);
+        else rgAudioMode.check(R.id.rbNormal);
+
+        // Sample rate
+        int sr = AppSettings.getSampleRate(this);
+        if (sr == 48000) rgSampleRate.check(R.id.rb48000);
+        else if (sr == 22050) rgSampleRate.check(R.id.rb22050);
+        else if (sr == 16000) rgSampleRate.check(R.id.rb16000);
+        else rgSampleRate.check(R.id.rb44100);
+
+        // Listeners
+        swMixAudio.setOnCheckedChangeListener((v, c) -> AppSettings.setMixAudio(this, c));
+        swNoise.setOnCheckedChangeListener((v, c) -> AppSettings.setNoiseSuppression(this, c));
+
+        swVideo.setOnCheckedChangeListener((v, c) -> {
+            AppSettings.setVideoEnabled(this, c);
+            // Send command to Menu Claro
+            String cmd = c ? "VIDEO_ON\n" : "VIDEO_OFF\n";
+            new Thread(() -> {
+                // Will be sent next time MonitorActivity connects
+            }).start();
+            Toast.makeText(this, c ? "Video enabled" : "Video disabled", Toast.LENGTH_SHORT).show();
         });
-        swNoise.setOnCheckedChangeListener((v, checked) -> AppSettings.setNoiseSuppression(this, checked));
+
+        rgAudioMode.setOnCheckedChangeListener((group, checkedId) -> {
+            if (checkedId == R.id.rbHighQuality) {
+                AppSettings.setAudioMode(this, 1);
+                Toast.makeText(this, "High quality - stereo PCM", Toast.LENGTH_SHORT).show();
+            } else if (checkedId == R.id.rbLowBandwidth) {
+                AppSettings.setAudioMode(this, 2);
+                Toast.makeText(this, "Low bandwidth mode", Toast.LENGTH_SHORT).show();
+            } else {
+                AppSettings.setAudioMode(this, 0);
+                Toast.makeText(this, "Normal mode", Toast.LENGTH_SHORT).show();
+            }
+        });
+
+        rgSampleRate.setOnCheckedChangeListener((group, checkedId) -> {
+            int rate = 44100;
+            if (checkedId == R.id.rb48000) rate = 48000;
+            else if (checkedId == R.id.rb22050) rate = 22050;
+            else if (checkedId == R.id.rb16000) rate = 16000;
+            AppSettings.setSampleRate(this, rate);
+            Toast.makeText(this, rate + " Hz", Toast.LENGTH_SHORT).show();
+        });
 
         btnChangePin.setOnClickListener(v -> {
             PinManager.clearPin(this);
