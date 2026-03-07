@@ -99,7 +99,6 @@ public class MonitorActivity extends AppCompatActivity {
 
         setupAudioTrack();
         setupEqualizer();
-        setupVolumeControl();
         setupButtons();
 
         running = true;
