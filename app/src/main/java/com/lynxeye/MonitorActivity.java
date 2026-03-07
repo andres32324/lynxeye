@@ -1,14 +1,11 @@
 package com.lynxeye;
 
-import android.Manifest;
-import android.content.pm.PackageManager;
 import android.media.AudioAttributes;
 import android.media.AudioFormat;
 import android.media.AudioManager;
 import android.media.AudioTrack;
 import android.media.audiofx.Equalizer;
 import android.os.Bundle;
-import android.os.Environment;
 import android.os.Handler;
 import android.view.View;
 import android.view.WindowManager;
@@ -18,8 +15,6 @@ import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
 
 import java.io.DataInputStream;
 import java.io.File;
@@ -43,15 +38,15 @@ public class MonitorActivity extends AppCompatActivity {
     private static final int SAMPLE_RATE = 44100;
     private static final int AUDIO_QUEUE_SIZE = 3;
     private static final int VIDEO_QUEUE_SIZE  = 2;
-    private static final int REQ_STORAGE = 101;
 
     private String deviceName, deviceIp;
 
-    private TextView   tvStatus, tvDeviceName, tvRecTime;
-    private ImageView  ivVideo;
-    private ImageButton btnRecord, btnSwitchCam, btnEq;
-    private SeekBar    seekVolume;
-    private View       layoutEq;
+    private TextView    tvStatus, tvDeviceName, tvRecTime;
+    private ImageView   ivVideo;
+    private ImageButton btnRecord, btnSwitchCam;
+    private android.widget.Button btnEq;
+    private SeekBar     seekVolume;
+    private View        layoutEq;
 
     private AudioTrack audioTrack;
     private Equalizer  equalizer;
@@ -95,7 +90,6 @@ public class MonitorActivity extends AppCompatActivity {
         tvDeviceName.setText(deviceName);
         setStatus("CONNECTING...", 0xFFFFAA00);
 
-        requestStoragePermission();
         setupAudioTrack();
         setupEqualizer();
         setupVolumeControl();
@@ -106,15 +100,6 @@ public class MonitorActivity extends AppCompatActivity {
         startAudioPlayer();
         startVideoReceiver();
         startVideoRenderer();
-    }
-
-    private void requestStoragePermission() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
-                != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this,
-                    new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE,
-                                 Manifest.permission.READ_EXTERNAL_STORAGE}, REQ_STORAGE);
-        }
     }
 
     private void updateStatus() {
@@ -307,18 +292,11 @@ public class MonitorActivity extends AppCompatActivity {
                 layoutEq.setVisibility(layoutEq.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE));
     }
 
-    // ─── RECORDING - saves to Movies/LynxEye ─────────────
+    // Usa carpeta privada de la app - no necesita permisos
     private File getRecordingsDir() {
-        // Try standard Movies directory first (always accessible)
-        File dir = new File(Environment.getExternalStoragePublicDirectory(
-                Environment.DIRECTORY_MOVIES), "LynxEye");
+        File dir = new File(getExternalFilesDir(null), "Recordings");
         if (!dir.exists()) dir.mkdirs();
-        if (dir.canWrite()) return dir;
-
-        // Fallback to app-specific external storage (no permission needed on Android 10+)
-        File fallback = new File(getExternalFilesDir(null), "Recordings");
-        if (!fallback.exists()) fallback.mkdirs();
-        return fallback;
+        return dir;
     }
 
     private void startRecording() {
@@ -342,7 +320,7 @@ public class MonitorActivity extends AppCompatActivity {
                 }
             };
             uiHandler.post(recTimeUpdater);
-            Toast.makeText(this, "Grabando en: " + dir.getAbsolutePath(), Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "Grabando en:\n" + dir.getAbsolutePath(), Toast.LENGTH_LONG).show();
         } catch (Exception e) {
             Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_LONG).show();
         }
