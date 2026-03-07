@@ -36,9 +36,7 @@ public class SettingsActivity extends AppCompatActivity {
 
         // Sample rate
         int sr = AppSettings.getSampleRate(this);
-        if (sr == 48000) rgSampleRate.check(R.id.rb48000);
-        else if (sr == 22050) rgSampleRate.check(R.id.rb22050);
-        else if (sr == 16000) rgSampleRate.check(R.id.rb16000);
+        if (sr == 16000) rgSampleRate.check(R.id.rb16000);
         else rgSampleRate.check(R.id.rb44100);
 
         // Listeners
@@ -69,10 +67,7 @@ public class SettingsActivity extends AppCompatActivity {
         });
 
         rgSampleRate.setOnCheckedChangeListener((group, checkedId) -> {
-            int rate = 44100;
-            if (checkedId == R.id.rb48000) rate = 48000;
-            else if (checkedId == R.id.rb22050) rate = 22050;
-            else if (checkedId == R.id.rb16000) rate = 16000;
+            int rate = (checkedId == R.id.rb16000) ? 16000 : 44100;
             AppSettings.setSampleRate(this, rate);
             Toast.makeText(this, rate + " Hz", Toast.LENGTH_SHORT).show();
         });

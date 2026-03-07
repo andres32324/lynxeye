@@ -5,6 +5,7 @@ import android.media.AudioFormat;
 import android.media.AudioManager;
 import android.media.AudioTrack;
 import android.media.audiofx.Equalizer;
+import android.media.audiofx.NoiseSuppressor;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
@@ -54,6 +55,7 @@ public class MonitorActivity extends AppCompatActivity {
 
     private AudioTrack audioTrack;
     private Equalizer  equalizer;
+    private NoiseSuppressor noiseSuppressor;
 
     private volatile boolean running        = false;
     private volatile boolean isRecording    = false;
@@ -99,6 +101,7 @@ public class MonitorActivity extends AppCompatActivity {
         setStatus("CONNECTING...", 0xFFFFAA00);
 
         setupAudioTrack();
+        setupNoiseSuppressor();
         setupEqualizer();
         setupVolumeControl();
         setupButtons();
@@ -286,6 +289,15 @@ public class MonitorActivity extends AppCompatActivity {
         }, "VideoRenderer").start();
     }
 
+    private void setupNoiseSuppressor() {
+        try {
+            if (AppSettings.isNoiseSuppression(this) && NoiseSuppressor.isAvailable()) {
+                noiseSuppressor = NoiseSuppressor.create(audioTrack.getAudioSessionId());
+                if (noiseSuppressor != null) noiseSuppressor.setEnabled(true);
+            }
+        } catch (Exception e) { e.printStackTrace(); }
+    }
+
     private void setupEqualizer() {
         try {
             equalizer = new Equalizer(0, audioTrack.getAudioSessionId());
@@ -459,6 +471,7 @@ public class MonitorActivity extends AppCompatActivity {
         audioQueue.clear();
         videoQueue.clear();
         if (isRecording) stopRecording();
+        if (noiseSuppressor != null) { noiseSuppressor.setEnabled(false); noiseSuppressor.release(); }
         if (equalizer != null) { equalizer.setEnabled(false); equalizer.release(); }
         if (audioTrack != null) { audioTrack.stop(); audioTrack.release(); }
     }

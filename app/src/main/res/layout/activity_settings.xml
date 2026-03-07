@@ -92,19 +92,11 @@
         <RadioGroup android:id="@+id/rgSampleRate" android:layout_width="match_parent"
             android:layout_height="wrap_content" android:orientation="vertical">
             <RadioButton android:id="@+id/rb44100" android:layout_width="wrap_content"
-                android:layout_height="wrap_content" android:text="44100 Hz  —  standard"
+                android:layout_height="wrap_content" android:text="44100 Hz  —  standard FL Studio"
                 android:textColor="#AAAAAA" android:textSize="12sp" android:fontFamily="monospace"
                 android:buttonTint="#00E676"/>
-            <RadioButton android:id="@+id/rb48000" android:layout_width="wrap_content"
-                android:layout_height="wrap_content" android:text="48000 Hz  —  professional"
-                android:textColor="#AAAAAA" android:textSize="12sp" android:fontFamily="monospace"
-                android:buttonTint="#00E676" android:layout_marginTop="8dp"/>
-            <RadioButton android:id="@+id/rb22050" android:layout_width="wrap_content"
-                android:layout_height="wrap_content" android:text="22050 Hz  —  medium"
-                android:textColor="#AAAAAA" android:textSize="12sp" android:fontFamily="monospace"
-                android:buttonTint="#00E676" android:layout_marginTop="8dp"/>
             <RadioButton android:id="@+id/rb16000" android:layout_width="wrap_content"
-                android:layout_height="wrap_content" android:text="16000 Hz  —  voice"
+                android:layout_height="wrap_content" android:text="16000 Hz  —  voice / low data"
                 android:textColor="#AAAAAA" android:textSize="12sp" android:fontFamily="monospace"
                 android:buttonTint="#00E676" android:layout_marginTop="8dp"/>
         </RadioGroup>
