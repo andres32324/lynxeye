@@ -3,6 +3,7 @@ package com.lynxeye;
 import android.app.AlertDialog;
 import android.content.Intent;
 import android.os.Bundle;
+import android.os.Handler;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -12,20 +13,28 @@ import android.widget.ImageButton;
 import android.widget.ListView;
 import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
+import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class MainActivity extends AppCompatActivity {
 
     private List<DeviceStorage.Device> devices;
     private DeviceAdapter adapter;
+    private Handler pingHandler = new Handler();
+    private Runnable pingRunnable;
+
+    // Cache: ip -> true/false
+    private ConcurrentHashMap<String, Boolean> statusMap = new ConcurrentHashMap<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        ListView listView    = findViewById(R.id.listDevices);
-        ImageButton btnAdd   = findViewById(R.id.btnAdd);
+        ListView listView         = findViewById(R.id.listDevices);
+        ImageButton btnAdd        = findViewById(R.id.btnAdd);
         ImageButton btnSettings   = findViewById(R.id.btnSettings);
         ImageButton btnRecordings = findViewById(R.id.btnRecordings);
 
@@ -33,10 +42,8 @@ public class MainActivity extends AppCompatActivity {
         adapter = new DeviceAdapter();
         listView.setAdapter(adapter);
 
-        listView.setOnItemClickListener((parent, view, position, id) -> {
-            DeviceStorage.Device device = devices.get(position);
-            openMonitor(device);
-        });
+        listView.setOnItemClickListener((parent, view, position, id) ->
+                openMonitor(devices.get(position)));
 
         listView.setOnItemLongClickListener((parent, view, position, id) -> {
             showDeleteDialog(position);
@@ -54,6 +61,49 @@ public class MainActivity extends AppCompatActivity {
         devices.clear();
         devices.addAll(DeviceStorage.getDevices(this));
         adapter.notifyDataSetChanged();
+        startPinging();
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        stopPinging();
+    }
+
+    private void startPinging() {
+        pingRunnable = new Runnable() {
+            @Override public void run() {
+                pingAllDevices();
+                pingHandler.postDelayed(this, 5000); // ping every 5s
+            }
+        };
+        pingHandler.post(pingRunnable);
+    }
+
+    private void stopPinging() {
+        if (pingRunnable != null) pingHandler.removeCallbacks(pingRunnable);
+    }
+
+    private void pingAllDevices() {
+        for (DeviceStorage.Device device : devices) {
+            final String ip = device.ip;
+            new Thread(() -> {
+                boolean online = isOnline(ip);
+                statusMap.put(ip, online);
+                runOnUiThread(() -> adapter.notifyDataSetChanged());
+            }).start();
+        }
+    }
+
+    private boolean isOnline(String ip) {
+        try {
+            Socket s = new Socket();
+            s.connect(new InetSocketAddress(ip, 9999), 1500);
+            s.close();
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     private void showAddDialog() {
@@ -109,10 +159,24 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public View getView(int position, View convertView, ViewGroup parent) {
             if (convertView == null)
-                convertView = LayoutInflater.from(MainActivity.this).inflate(R.layout.item_device, parent, false);
+                convertView = LayoutInflater.from(MainActivity.this)
+                        .inflate(R.layout.item_device, parent, false);
+
             DeviceStorage.Device d = devices.get(position);
             ((TextView) convertView.findViewById(R.id.tvDeviceName)).setText(d.name);
             ((TextView) convertView.findViewById(R.id.tvDeviceIp)).setText(d.ip + "  #" + d.code);
+
+            // Status dot
+            TextView dot = convertView.findViewById(R.id.tvStatusDot);
+            Boolean online = statusMap.get(d.ip);
+            if (online == null) {
+                dot.setTextColor(0xFF444444); // grey = checking
+            } else if (online) {
+                dot.setTextColor(0xFF00E676); // green = online
+            } else {
+                dot.setTextColor(0xFFFF3D3D); // red = offline
+            }
+
             return convertView;
         }
     }
