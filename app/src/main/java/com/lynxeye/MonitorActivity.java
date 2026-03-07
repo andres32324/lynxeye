@@ -4,6 +4,7 @@ import android.media.AudioAttributes;
 import android.media.AudioFormat;
 import android.media.AudioManager;
 import android.media.AudioTrack;
+import android.media.audiofx.NoiseSuppressor;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
@@ -473,7 +474,7 @@ public class MonitorActivity extends AppCompatActivity {
         audioQueue.clear();
         videoQueue.clear();
         if (isRecording) stopRecording();
-        if (equalizer != null) { equalizer.setEnabled(false); equalizer.release(); }
+        
         if (audioTrack != null) { audioTrack.stop(); audioTrack.release(); }
     }
 }
