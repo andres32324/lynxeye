@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#0A0A0A">
+
+    <!-- Header -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:text="[ RECORDINGS ]"
+        android:textColor="#00E676"
+        android:textSize="16sp"
+        android:fontFamily="monospace"
+        android:gravity="center"
+        android:background="#111111"/>
+
+    <!-- Empty state -->
+    <TextView
+        android:id="@+id/tvEmpty"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="// no recordings found"
+        android:textColor="#444444"
+        android:textSize="14sp"
+        android:fontFamily="monospace"
+        android:gravity="center"
+        android:padding="32dp"
+        android:visibility="gone"/>
+
+    <!-- Recordings list -->
+    <ListView
+        android:id="@+id/listRecordings"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:divider="#1A1A1A"
+        android:dividerHeight="1dp"/>
+
+    <!-- Player panel -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="#111111"
+        android:padding="12dp">
+
+        <!-- Now playing -->
+        <TextView
+            android:id="@+id/tvNowPlaying"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="SIN REPRODUCCIÓN"
+            android:textColor="#00E676"
+            android:textSize="12sp"
+            android:fontFamily="monospace"
+            android:singleLine="true"
+            android:ellipsize="end"
+            android:paddingBottom="8dp"/>
+
+        <!-- Seek bar -->
+        <SeekBar
+            android:id="@+id/seekPlayback"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:progressTint="#00E676"
+            android:thumbTint="#00E676"/>
+
+        <!-- Time row -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingTop="4dp">
+
+            <TextView
+                android:id="@+id/tvCurrentTime"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="00:00"
+                android:textColor="#888888"
+                android:textSize="11sp"
+                android:fontFamily="monospace"/>
+
+            <View android:layout_width="0dp" android:layout_height="1dp" android:layout_weight="1"/>
+
+            <TextView
+                android:id="@+id/tvTotalTime"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="00:00"
+                android:textColor="#888888"
+                android:textSize="11sp"
+                android:fontFamily="monospace"/>
+        </LinearLayout>
+
+        <!-- Controls -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:paddingTop="8dp">
+
+            <ImageButton
+                android:id="@+id/btnPlayPause"
+                android:layout_width="52dp"
+                android:layout_height="52dp"
+                android:src="@android:drawable/ic_media_play"
+                android:background="#1A1A1A"
+                android:tint="#00E676"
+                android:padding="10dp"/>
+
+            <View android:layout_width="16dp" android:layout_height="1dp"/>
+
+            <ImageButton
+                android:id="@+id/btnStop"
+                android:layout_width="52dp"
+                android:layout_height="52dp"
+                android:src="@android:drawable/ic_media_previous"
+                android:background="#1A1A1A"
+                android:tint="#FF3D3D"
+                android:padding="10dp"/>
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>

@@ -24,9 +24,10 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        ListView listView = findViewById(R.id.listDevices);
-        ImageButton btnAdd = findViewById(R.id.btnAdd);
-        ImageButton btnSettings = findViewById(R.id.btnSettings);
+        ListView listView    = findViewById(R.id.listDevices);
+        ImageButton btnAdd   = findViewById(R.id.btnAdd);
+        ImageButton btnSettings   = findViewById(R.id.btnSettings);
+        ImageButton btnRecordings = findViewById(R.id.btnRecordings);
 
         devices = DeviceStorage.getDevices(this);
         adapter = new DeviceAdapter();
@@ -44,6 +45,7 @@ public class MainActivity extends AppCompatActivity {
 
         btnAdd.setOnClickListener(v -> showAddDialog());
         btnSettings.setOnClickListener(v -> startActivity(new Intent(this, SettingsActivity.class)));
+        btnRecordings.setOnClickListener(v -> startActivity(new Intent(this, RecordingsActivity.class)));
     }
 
     @Override

@@ -27,5 +27,6 @@
         <activity android:name=".MonitorActivity" android:exported="false" android:screenOrientation="portrait"/>
         <activity android:name=".SettingsActivity" android:exported="false" android:screenOrientation="portrait"/>
 
+            <activity android:name=".RecordingsActivity"/>
     </application>
 </manifest>

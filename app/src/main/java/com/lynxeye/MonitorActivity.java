@@ -43,7 +43,8 @@ public class MonitorActivity extends AppCompatActivity {
 
     private TextView    tvStatus, tvDeviceName, tvRecTime;
     private ImageView   ivVideo;
-    private ImageButton btnRecord, btnSwitchCam, btnEq;
+    private ImageButton btnRecord, btnSwitchCam;
+    private android.widget.Button btnEq;
     private SeekBar     seekVolume;
     private View        layoutEq;
 
