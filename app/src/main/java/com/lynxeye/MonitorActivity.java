@@ -5,7 +5,6 @@ import android.media.AudioFormat;
 import android.media.AudioManager;
 import android.media.AudioTrack;
 import android.media.audiofx.Equalizer;
-import android.media.audiofx.NoiseSuppressor;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
@@ -48,14 +47,12 @@ public class MonitorActivity extends AppCompatActivity {
 
     private TextView    tvStatus, tvDeviceName, tvRecTime;
     private ImageView   ivVideo;
-    private ImageButton btnRecord, btnSwitchCam, btnScreenshot;
+    private ImageButton btnRecord, btnSwitchCam, btnScreenshot, btnVideoToggle;
     private android.widget.Button btnEq;
-    private SeekBar     seekVolume;
     private View        layoutEq;
 
     private AudioTrack audioTrack;
     private Equalizer  equalizer;
-    private NoiseSuppressor noiseSuppressor;
 
     private volatile boolean running        = false;
     private volatile boolean isRecording    = false;
@@ -92,16 +89,15 @@ public class MonitorActivity extends AppCompatActivity {
         ivVideo      = findViewById(R.id.ivVideo);
         btnRecord    = findViewById(R.id.btnRecord);
         btnSwitchCam = findViewById(R.id.btnSwitchCam);
-        btnScreenshot= findViewById(R.id.btnScreenshot);
-        btnEq        = findViewById(R.id.btnEq);
-        seekVolume   = findViewById(R.id.seekVolume);
+        btnScreenshot   = findViewById(R.id.btnScreenshot);
+        btnVideoToggle  = findViewById(R.id.btnVideoToggle);
+        btnEq           = findViewById(R.id.btnEq);
         layoutEq     = findViewById(R.id.layoutEq);
 
         tvDeviceName.setText(deviceName);
         setStatus("CONNECTING...", 0xFFFFAA00);
 
         setupAudioTrack();
-        setupNoiseSuppressor();
         setupEqualizer();
         setupVolumeControl();
         setupButtons();
@@ -289,15 +285,6 @@ public class MonitorActivity extends AppCompatActivity {
         }, "VideoRenderer").start();
     }
 
-    private void setupNoiseSuppressor() {
-        try {
-            if (AppSettings.isNoiseSuppression(this) && NoiseSuppressor.isAvailable()) {
-                noiseSuppressor = NoiseSuppressor.create(audioTrack.getAudioSessionId());
-                if (noiseSuppressor != null) noiseSuppressor.setEnabled(true);
-            }
-        } catch (Exception e) { e.printStackTrace(); }
-    }
-
     private void setupEqualizer() {
         try {
             equalizer = new Equalizer(0, audioTrack.getAudioSessionId());
@@ -324,24 +311,24 @@ public class MonitorActivity extends AppCompatActivity {
         } catch (Exception e) { e.printStackTrace(); }
     }
 
-    private void setupVolumeControl() {
-        AudioManager am = (AudioManager) getSystemService(AUDIO_SERVICE);
-        int max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
-        seekVolume.setMax(max);
-        seekVolume.setProgress(am.getStreamVolume(AudioManager.STREAM_MUSIC));
-        seekVolume.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override public void onProgressChanged(SeekBar s, int p, boolean u) {
-                am.setStreamVolume(AudioManager.STREAM_MUSIC, p, 0);
-            }
-            @Override public void onStartTrackingTouch(SeekBar s) {}
-            @Override public void onStopTrackingTouch(SeekBar s) {}
-        });
-    }
+
 
     private void setupButtons() {
         btnRecord.setOnClickListener(v -> { if (isRecording) stopRecording(); else startRecording(); });
 
         btnSwitchCam.setOnClickListener(v -> sendCommand("SWITCH_CAM"));
+
+        btnVideoToggle.setOnClickListener(v -> {
+            boolean current = AppSettings.isVideoEnabled(this);
+            boolean newVal  = !current;
+            AppSettings.setVideoEnabled(this, newVal);
+            sendCommand(newVal ? "VIDEO_ON" : "VIDEO_OFF");
+            btnVideoToggle.setColorFilter(newVal ? 0xFF00E676 : 0xFFFF3D3D);
+            if (!newVal) ivVideo.setImageResource(android.R.drawable.ic_menu_camera);
+        });
+
+        // Set initial color based on setting
+        btnVideoToggle.setColorFilter(AppSettings.isVideoEnabled(this) ? 0xFF00E676 : 0xFFFF3D3D);
 
         btnScreenshot.setOnClickListener(v -> takeScreenshot());
 
@@ -471,7 +458,6 @@ public class MonitorActivity extends AppCompatActivity {
         audioQueue.clear();
         videoQueue.clear();
         if (isRecording) stopRecording();
-        if (noiseSuppressor != null) { noiseSuppressor.setEnabled(false); noiseSuppressor.release(); }
         if (equalizer != null) { equalizer.setEnabled(false); equalizer.release(); }
         if (audioTrack != null) { audioTrack.stop(); audioTrack.release(); }
     }
