@@ -57,6 +57,7 @@ public class MonitorActivity extends AppCompatActivity {
     private ImageButton btnRecord, btnSwitchCam, btnScreenshot, btnVideoToggle, btnAudioToggle;
     private android.widget.Button btnEq;
     private View        layoutEq;
+    private AudioVisualizerView visualizer;
 
     private AudioTrack      audioTrack;
     private DspEqualizer    dspEq;
@@ -103,6 +104,7 @@ public class MonitorActivity extends AppCompatActivity {
         btnAudioToggle  = findViewById(R.id.btnAudioToggle);
         btnEq           = findViewById(R.id.btnEq);
         layoutEq        = findViewById(R.id.layoutEq);
+        visualizer      = findViewById(R.id.visualizer);
 
         tvDeviceName.setText(deviceName);
         setStatus("CONNECTING...", 0xFFFFAA00);
@@ -140,8 +142,10 @@ public class MonitorActivity extends AppCompatActivity {
 
     @Override
     public void onBackPressed() {
-        // Don't stop - go to background keeping audio alive
-        moveTaskToBack(true);
+        // Go back to MainActivity keeping audio alive
+        Intent intent = new Intent(this, MainActivity.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        startActivity(intent);
     }
 
     private void showBackgroundNotification() {
@@ -297,6 +301,7 @@ public class MonitorActivity extends AppCompatActivity {
                     if (chunk != null) {
                         if (dspEq != null) chunk = dspEq.process(chunk);
                         if (audioEnabled) audioTrack.write(chunk, 0, chunk.length);
+                        if (visualizer != null) visualizer.updateAudio(chunk);
                         if (isRecording && recordingStream != null) {
                             try { recordingStream.write(chunk, 0, chunk.length); totalAudioBytes += chunk.length; }
                             catch (Exception ignored) {}
