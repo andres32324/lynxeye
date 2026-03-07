@@ -40,11 +40,10 @@ public class DeviceStorage {
     public static void saveDevice(Context ctx, Device device) {
         try {
             List<Device> devices = getDevices(ctx);
-            // Remove duplicate by code
-            devices.removeIf(d -> d.code.equals(device.code));
+            // Remove duplicate by code + ip (same device same IP)
+            devices.removeIf(d -> d.code.equals(device.code) && d.ip.equals(device.ip));
             devices.add(0, device);
-            // Keep max 10 devices
-            if (devices.size() > 10) devices = devices.subList(0, 10);
+            if (devices.size() > 20) devices = devices.subList(0, 20);
             JSONArray arr = new JSONArray();
             for (Device d : devices) {
                 JSONObject obj = new JSONObject();
@@ -57,10 +56,10 @@ public class DeviceStorage {
         } catch (Exception e) { e.printStackTrace(); }
     }
 
-    public static void deleteDevice(Context ctx, String code) {
+    public static void deleteDevice(Context ctx, String code, String ip) {
         try {
             List<Device> devices = getDevices(ctx);
-            devices.removeIf(d -> d.code.equals(code));
+            devices.removeIf(d -> d.code.equals(code) && d.ip.equals(ip));
             JSONArray arr = new JSONArray();
             for (Device d : devices) {
                 JSONObject obj = new JSONObject();

@@ -135,7 +135,7 @@ public class MainActivity extends AppCompatActivity {
             .setTitle("DELETE DEVICE")
             .setMessage("Remove " + devices.get(position).name + "?")
             .setPositiveButton("DELETE", (d, w) -> {
-                DeviceStorage.deleteDevice(this, devices.get(position).code);
+                DeviceStorage.deleteDevice(this, devices.get(position).code, devices.get(position).ip);
                 devices.remove(position);
                 adapter.notifyDataSetChanged();
             })
