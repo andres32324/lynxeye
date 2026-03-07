@@ -221,6 +221,7 @@ public class MonitorActivity extends AppCompatActivity {
                 try {
                     byte[] chunk = audioQueue.poll(500, TimeUnit.MILLISECONDS);
                     if (chunk != null) {
+                        if (dspEq != null) chunk = dspEq.process(chunk);
                         audioTrack.write(chunk, 0, chunk.length);
                         if (isRecording && recordingStream != null) {
                             try { recordingStream.write(chunk, 0, chunk.length); totalAudioBytes += chunk.length; }
@@ -285,29 +286,32 @@ public class MonitorActivity extends AppCompatActivity {
     }
 
     private void setupEqualizer() {
-        try {
-            equalizer = new Equalizer(0, audioTrack.getAudioSessionId());
-            equalizer.setEnabled(true);
-            int[]    seekIds  = {R.id.seekBand0,R.id.seekBand1,R.id.seekBand2,R.id.seekBand3,R.id.seekBand4};
-            int[]    labelIds = {R.id.tvBand0,  R.id.tvBand1,  R.id.tvBand2,  R.id.tvBand3,  R.id.tvBand4};
-            String[] labels   = {"60Hz","230Hz","910Hz","3.6k","14k"};
-            short[]  range    = equalizer.getBandLevelRange();
-            short min = range[0], max = range[1];
-            for (int i = 0; i < 5 && i < equalizer.getNumberOfBands(); i++) {
-                ((TextView) findViewById(labelIds[i])).setText(labels[i]);
-                SeekBar sb = findViewById(seekIds[i]);
-                sb.setMax(max - min);
-                sb.setProgress(equalizer.getBandLevel((short) i) - min);
-                final int band = i; final short bMin = min;
-                sb.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-                    @Override public void onProgressChanged(SeekBar s, int p, boolean u) {
-                        equalizer.setBandLevel((short) band, (short)(p + bMin));
-                    }
-                    @Override public void onStartTrackingTouch(SeekBar s) {}
-                    @Override public void onStopTrackingTouch(SeekBar s) {}
-                });
-            }
-        } catch (Exception e) { e.printStackTrace(); }
+        dspEq = new DspEqualizer(sampleRate);
+
+        int[] seekIds = {R.id.seekBand0,R.id.seekBand1,R.id.seekBand2,R.id.seekBand3,R.id.seekBand4,
+                         R.id.seekBand5,R.id.seekBand6,R.id.seekBand7,R.id.seekBand8,R.id.seekBand9};
+        int[] gainIds = {R.id.tvGain0,R.id.tvGain1,R.id.tvGain2,R.id.tvGain3,R.id.tvGain4,
+                         R.id.tvGain5,R.id.tvGain6,R.id.tvGain7,R.id.tvGain8,R.id.tvGain9};
+        int[] labelIds= {R.id.tvBand0,R.id.tvBand1,R.id.tvBand2,R.id.tvBand3,R.id.tvBand4,
+                         R.id.tvBand5,R.id.tvBand6,R.id.tvBand7,R.id.tvBand8,R.id.tvBand9};
+
+        for (int i = 0; i < DspEqualizer.BANDS; i++) {
+            ((android.widget.TextView) findViewById(labelIds[i])).setText(DspEqualizer.LABELS[i]);
+            SeekBar sb = findViewById(seekIds[i]);
+            sb.setMax(240); // 0-240 mapped to -12dB to +12dB
+            sb.setProgress(120); // center = 0dB
+            final int band = i;
+            final android.widget.TextView tvGain = findViewById(gainIds[i]);
+            sb.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                @Override public void onProgressChanged(SeekBar s, int p, boolean u) {
+                    float db = (p - 120) / 10f; // -12 to +12 dB
+                    dspEq.setGain(band, db);
+                    tvGain.setText(String.format(java.util.Locale.getDefault(), "%+.0fdB", db));
+                }
+                @Override public void onStartTrackingTouch(SeekBar s) {}
+                @Override public void onStopTrackingTouch(SeekBar s) {}
+            });
+        }
     }
 
 
@@ -324,11 +328,12 @@ public class MonitorActivity extends AppCompatActivity {
             sendCommand(newVal ? "VIDEO_ON" : "VIDEO_OFF");
             btnVideoToggle.setColorFilter(newVal ? 0xFF00E676 : 0xFFFF3D3D);
             if (!newVal) {
+                videoQueue.clear();
+                lastFrame = null;
                 ivVideo.setImageBitmap(null);
-                ivVideo.setBackgroundColor(0xFF0A1A0A); // dark green
+                ivVideo.setBackgroundColor(0xFF0A1A0A);
             } else {
                 ivVideo.setBackgroundColor(0xFF111111);
-                // Restart video receiver
                 startVideoReceiver();
                 startVideoRenderer();
             }
