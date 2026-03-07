@@ -63,6 +63,7 @@ public class MonitorActivity extends AppCompatActivity {
     private NoiseSuppressor noiseSuppressor;
 
     private volatile boolean running        = false;
+    private boolean goingBack = false;
     private volatile boolean audioEnabled   = true;
     private volatile boolean isRecording    = false;
     private volatile boolean audioConnected = false;
@@ -145,7 +146,7 @@ public class MonitorActivity extends AppCompatActivity {
 
     @Override
     public void onBackPressed() {
-        // Go back to MainActivity keeping audio alive
+        goingBack = true;
         Intent intent = new Intent(this, MainActivity.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         startActivity(intent);
@@ -548,7 +549,9 @@ public class MonitorActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        cancelNotification();
-        stopAudio();
+        if (!goingBack) {
+            cancelNotification();
+            stopAudio();
+        }
     }
 }
