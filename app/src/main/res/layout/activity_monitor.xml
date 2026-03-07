@@ -55,6 +55,11 @@
             android:src="@android:drawable/ic_menu_view"
             android:background="#1A1A1A" android:tint="#00E676" android:padding="8dp"/>
 
+        <ImageButton android:id="@+id/btnAudioToggle"
+            android:layout_width="44dp" android:layout_height="44dp"
+            android:src="@android:drawable/ic_btn_speak_now"
+            android:background="#1A1A1A" android:tint="#00E676" android:padding="8dp"/>
+
         <ImageButton android:id="@+id/btnSwitchCam"
             android:layout_width="44dp" android:layout_height="44dp"
             android:src="@android:drawable/ic_menu_camera"
