@@ -57,7 +57,6 @@ public class MonitorActivity extends AppCompatActivity {
     private ImageButton btnRecord, btnSwitchCam, btnScreenshot, btnVideoToggle, btnAudioToggle;
     private android.widget.Button btnEq;
     private View        layoutEq;
-    private AudioVisualizerView visualizer;
 
     private AudioTrack      audioTrack;
     private DspEqualizer    dspEq;
@@ -104,7 +103,6 @@ public class MonitorActivity extends AppCompatActivity {
         btnAudioToggle  = findViewById(R.id.btnAudioToggle);
         btnEq           = findViewById(R.id.btnEq);
         layoutEq        = findViewById(R.id.layoutEq);
-        visualizer      = findViewById(R.id.visualizer);
 
         tvDeviceName.setText(deviceName);
         setStatus("CONNECTING...", 0xFFFFAA00);
@@ -131,13 +129,18 @@ public class MonitorActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         cancelNotification();
+        // Resume AudioTrack if it was paused
+        if (audioTrack != null && audioTrack.getPlayState() != android.media.AudioTrack.PLAYSTATE_PLAYING) {
+            audioTrack.play();
+        }
     }
 
     @Override
     protected void onPause() {
         super.onPause();
-        // Keep audio running in background with notification
+        // Keep audio running - just show notification
         if (running && audioEnabled) showBackgroundNotification();
+        // DO NOT pause audioTrack here
     }
 
     @Override
@@ -301,7 +304,6 @@ public class MonitorActivity extends AppCompatActivity {
                     if (chunk != null) {
                         if (dspEq != null) chunk = dspEq.process(chunk);
                         if (audioEnabled) audioTrack.write(chunk, 0, chunk.length);
-                        if (visualizer != null) visualizer.updateAudio(chunk);
                         if (isRecording && recordingStream != null) {
                             try { recordingStream.write(chunk, 0, chunk.length); totalAudioBytes += chunk.length; }
                             catch (Exception ignored) {}
