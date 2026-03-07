@@ -4,7 +4,6 @@ import android.media.AudioAttributes;
 import android.media.AudioFormat;
 import android.media.AudioManager;
 import android.media.AudioTrack;
-import android.media.audiofx.Equalizer;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
@@ -51,8 +50,9 @@ public class MonitorActivity extends AppCompatActivity {
     private android.widget.Button btnEq;
     private View        layoutEq;
 
-    private AudioTrack audioTrack;
-    private Equalizer  equalizer;
+    private AudioTrack     audioTrack;
+    private DspEqualizer   dspEq;
+    private NoiseSuppressor noiseSuppressor;
 
     private volatile boolean running        = false;
     private volatile boolean isRecording    = false;
