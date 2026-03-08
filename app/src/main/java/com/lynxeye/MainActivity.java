@@ -24,9 +24,8 @@ public class MainActivity extends AppCompatActivity {
     private DeviceAdapter adapter;
     private Handler pingHandler = new Handler();
     private Runnable pingRunnable;
-
-    // Cache: ip -> true/false
     private ConcurrentHashMap<String, Boolean> statusMap = new ConcurrentHashMap<>();
+    private HackerVisualizerView hackerVisualizer;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -37,6 +36,7 @@ public class MainActivity extends AppCompatActivity {
         ImageButton btnAdd        = findViewById(R.id.btnAdd);
         ImageButton btnSettings   = findViewById(R.id.btnSettings);
         ImageButton btnRecordings = findViewById(R.id.btnRecordings);
+        hackerVisualizer          = findViewById(R.id.hackerVisualizer);
 
         devices = DeviceStorage.getDevices(this);
         adapter = new DeviceAdapter();
@@ -62,19 +62,29 @@ public class MainActivity extends AppCompatActivity {
         devices.addAll(DeviceStorage.getDevices(this));
         adapter.notifyDataSetChanged();
         startPinging();
+
+        // Start/stop visualizer based on setting
+        if (AppSettings.isVisualizerEnabled(this)) {
+            hackerVisualizer.setVisibility(View.VISIBLE);
+            hackerVisualizer.start();
+        } else {
+            hackerVisualizer.stop();
+            hackerVisualizer.setVisibility(View.GONE);
+        }
     }
 
     @Override
     protected void onPause() {
         super.onPause();
         stopPinging();
+        hackerVisualizer.stop();
     }
 
     private void startPinging() {
         pingRunnable = new Runnable() {
             @Override public void run() {
                 pingAllDevices();
-                pingHandler.postDelayed(this, 5000); // ping every 5s
+                pingHandler.postDelayed(this, 5000);
             }
         };
         pingHandler.post(pingRunnable);
@@ -101,9 +111,7 @@ public class MainActivity extends AppCompatActivity {
             s.connect(new InetSocketAddress(ip, 9999), 1500);
             s.close();
             return true;
-        } catch (Exception e) {
-            return false;
-        }
+        } catch (Exception e) { return false; }
     }
 
     private void showAddDialog() {
@@ -120,7 +128,6 @@ public class MainActivity extends AppCompatActivity {
                 String ip   = etIp.getText().toString().trim();
                 String code = etCode.getText().toString().trim().toUpperCase();
                 if (!name.isEmpty() && !ip.isEmpty()) {
-                    if (name.isEmpty()) name = "Cat Monitor";
                     DeviceStorage.Device device = new DeviceStorage.Device(name, ip, code);
                     DeviceStorage.saveDevice(this, device);
                     openMonitor(device);
@@ -166,16 +173,11 @@ public class MainActivity extends AppCompatActivity {
             ((TextView) convertView.findViewById(R.id.tvDeviceName)).setText(d.name);
             ((TextView) convertView.findViewById(R.id.tvDeviceIp)).setText(d.ip + "  #" + d.code);
 
-            // Status dot
             TextView dot = convertView.findViewById(R.id.tvStatusDot);
             Boolean online = statusMap.get(d.ip);
-            if (online == null) {
-                dot.setTextColor(0xFF444444); // grey = checking
-            } else if (online) {
-                dot.setTextColor(0xFF00E676); // green = online
-            } else {
-                dot.setTextColor(0xFFFF3D3D); // red = offline
-            }
+            if (online == null) dot.setTextColor(0xFF444444);
+            else if (online)    dot.setTextColor(0xFF00E676);
+            else                dot.setTextColor(0xFFFF3D3D);
 
             return convertView;
         }

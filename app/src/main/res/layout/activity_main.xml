@@ -89,11 +89,21 @@
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="No devices saved\nTap + to add a device"
+        android:text="No devices saved&#10;Tap + to add a device"
         android:textColor="#333333"
         android:fontFamily="monospace"
         android:textSize="13sp"
         android:gravity="center"
         android:padding="40dp"/>
+
+    <!-- Divider -->
+    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#1A2E1A"/>
+
+    <!-- Hacker Visualizer at bottom -->
+    <com.lynxeye.HackerVisualizerView
+        android:id="@+id/hackerVisualizer"
+        android:layout_width="match_parent"
+        android:layout_height="100dp"
+        android:background="#0A0A0A"/>
 
 </LinearLayout>

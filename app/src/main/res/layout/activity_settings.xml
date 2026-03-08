@@ -43,7 +43,6 @@
         android:text="AUDIO" android:textSize="10sp" android:textColor="#00E676"
         android:fontFamily="monospace" android:letterSpacing="0.3" android:layout_marginBottom="12dp"/>
 
-    <!-- Mix audio -->
     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
         android:orientation="horizontal" android:gravity="center_vertical"
         android:background="@drawable/card_dark" android:padding="16dp" android:layout_marginBottom="8dp">
@@ -58,7 +57,6 @@
         <Switch android:id="@+id/swMixAudio" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
     </LinearLayout>
 
-    <!-- Audio mode -->
     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
         android:orientation="vertical" android:background="@drawable/card_dark"
         android:padding="16dp" android:layout_marginBottom="8dp">
@@ -82,7 +80,6 @@
         </RadioGroup>
     </LinearLayout>
 
-    <!-- Sample rate -->
     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
         android:orientation="vertical" android:background="@drawable/card_dark"
         android:padding="16dp" android:layout_marginBottom="8dp">
@@ -102,7 +99,6 @@
         </RadioGroup>
     </LinearLayout>
 
-    <!-- Noise suppression -->
     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
         android:orientation="horizontal" android:gravity="center_vertical"
         android:background="@drawable/card_dark" android:padding="16dp" android:layout_marginBottom="24dp">
@@ -115,6 +111,25 @@
                 android:textSize="11sp" android:fontFamily="monospace"/>
         </LinearLayout>
         <Switch android:id="@+id/swNoise" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+    </LinearLayout>
+
+    <!-- DISPLAY -->
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:text="DISPLAY" android:textSize="10sp" android:textColor="#00E676"
+        android:fontFamily="monospace" android:letterSpacing="0.3" android:layout_marginBottom="12dp"/>
+
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="horizontal" android:gravity="center_vertical"
+        android:background="@drawable/card_dark" android:padding="16dp" android:layout_marginBottom="24dp">
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+            android:layout_weight="1" android:orientation="vertical">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="Hacker visualizer" android:textColor="#FFFFFF" android:textSize="14sp"/>
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="Animated waveform on main screen" android:textColor="#555555"
+                android:textSize="11sp" android:fontFamily="monospace"/>
+        </LinearLayout>
+        <Switch android:id="@+id/swVisualizer" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
     </LinearLayout>
 
     <!-- SECURITY -->
