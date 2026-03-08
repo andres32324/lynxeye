@@ -95,7 +95,18 @@ public class AudioService extends Service {
 
     // ─── Public API ───────────────────────────────────────
     public void startMonitoring(String ip, String name, int sr, int mode, boolean noiseSup) {
-        if (running) return;
+        // If already running for same device, do nothing
+        if (running && ip.equals(deviceIp)) return;
+
+        // If running for different device, stop first
+        if (running) {
+            running = false;
+            audioQueue.clear();
+            try { Thread.sleep(300); } catch (Exception ignored) {}
+            if (audioTrack != null) { try { audioTrack.stop(); audioTrack.release(); } catch (Exception ignored) {} audioTrack = null; }
+            if (noiseSuppressor != null) { try { noiseSuppressor.release(); } catch (Exception ignored) {} noiseSuppressor = null; }
+        }
+
         this.deviceIp   = ip;
         this.deviceName = name;
         this.sampleRate = sr;
