@@ -7,6 +7,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
 import android.net.ConnectivityManager;
+import android.net.wifi.WifiManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.net.NetworkRequest;
@@ -83,6 +84,7 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
 
     // Network / Screen
     private ConnectivityManager.NetworkCallback networkCallback;
+    private WifiManager.WifiLock wifiLock;
     private BroadcastReceiver screenReceiver;
 
     // Recording UI
@@ -160,6 +162,7 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
 
         registerNetworkCallback();
         registerScreenReceiver();
+        acquireWifiLock();
     }
 
     @Override
@@ -174,6 +177,7 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
         if (vs != null) { try { vs.close(); } catch (Exception ignored) {} videoSocket = null; }
         unregisterNetworkCallback();
         unregisterScreenReceiver();
+        if (wifiLock != null && wifiLock.isHeld()) wifiLock.release();
         if (serviceBound) {
             audioService.setCallback(null);
             unbindService(serviceConn);
@@ -234,8 +238,10 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
     }
 
     private void sendCmdDirect(String cmd) {
-        PrintWriter w = cmdWriter;
-        if (w != null) w.println(cmd);
+        new Thread(() -> {
+            PrintWriter w = cmdWriter;
+            if (w != null) w.println(cmd);
+        }).start();
     }
 
     private void closeCmdSocket() {
@@ -261,6 +267,14 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
     }
 
     // ─── Screen Monitor ───────────────────────────────────
+    private void acquireWifiLock() {
+        try {
+            WifiManager wm = (WifiManager) getApplicationContext().getSystemService(WIFI_SERVICE);
+            wifiLock = wm.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "LynxEye::WifiLock");
+            wifiLock.acquire();
+        } catch (Exception ignored) {}
+    }
+
     private void registerScreenReceiver() {
         screenReceiver = new BroadcastReceiver() {
             @Override
