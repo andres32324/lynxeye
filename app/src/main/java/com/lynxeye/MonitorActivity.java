@@ -171,6 +171,44 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
         finish();
     }
 
+    // ─── Screen Monitor ───────────────────────────────────────────
+    private void registerScreenReceiver() {
+        screenReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context ctx, Intent intent) {
+                String action = intent.getAction();
+                if (Intent.ACTION_SCREEN_OFF.equals(action)) {
+                    if (videoEnabled && running) {
+                        videoQueue.clear();
+                        lastFrame = null;
+                        runOnUiThread(() -> {
+                            ivVideo.setImageBitmap(null);
+                            ivVideo.setBackgroundColor(0xFF0A1A0A);
+                        });
+                        stopVideoWatchdog();
+                    }
+                } else if (Intent.ACTION_SCREEN_ON.equals(action)) {
+                    if (videoEnabled && running) {
+                        runOnUiThread(() -> ivVideo.setBackgroundColor(0xFF111111));
+                        startVideoReceiver();
+                        startVideoRenderer();
+                        startVideoWatchdog();
+                    }
+                }
+            }
+        };
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(Intent.ACTION_SCREEN_OFF);
+        filter.addAction(Intent.ACTION_SCREEN_ON);
+        registerReceiver(screenReceiver, filter);
+    }
+
+    private void unregisterScreenReceiver() {
+        try {
+            if (screenReceiver != null) unregisterReceiver(screenReceiver);
+        } catch (Exception ignored) {}
+    }
+
     // ─── Network Monitor ──────────────────────────────────
     private void registerNetworkCallback() {
         try {
