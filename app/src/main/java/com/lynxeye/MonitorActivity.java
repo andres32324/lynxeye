@@ -51,7 +51,9 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
     private ImageView   ivVideo;
     private ImageButton btnRecord, btnSwitchCam, btnScreenshot, btnVideoToggle, btnAudioToggle;
     private android.widget.Button btnEq;
+    private android.widget.Button btnNight;
     private View        layoutEq;
+    private volatile boolean nightMode = false;
 
     // Service
     private AudioService audioService;
@@ -119,6 +121,7 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
         btnVideoToggle = findViewById(R.id.btnVideoToggle);
         btnAudioToggle = findViewById(R.id.btnAudioToggle);
         btnEq          = findViewById(R.id.btnEq);
+        btnNight       = findViewById(R.id.btnNight);
         layoutEq       = findViewById(R.id.layoutEq);
 
         tvDeviceName.setText(deviceName);
@@ -318,7 +321,12 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
                         android.graphics.BitmapFactory.Options opts = new android.graphics.BitmapFactory.Options();
                         opts.inPreferredConfig = android.graphics.Bitmap.Config.RGB_565;
                         android.graphics.Bitmap bmp = android.graphics.BitmapFactory.decodeByteArray(frame, 0, frame.length, opts);
-                        if (bmp != null) { lastFrame = bmp; runOnUiThread(() -> ivVideo.setImageBitmap(bmp)); }
+                        if (bmp != null) {
+                            if (nightMode) bmp = applyNightFilter(bmp);
+                            lastFrame = bmp;
+                            final android.graphics.Bitmap display = bmp;
+                            runOnUiThread(() -> ivVideo.setImageBitmap(display));
+                        }
                     } else if (lastFrame != null) {
                         final android.graphics.Bitmap keep = lastFrame;
                         runOnUiThread(() -> ivVideo.setImageBitmap(keep));
@@ -448,6 +456,12 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
             } catch (Exception e) {
                 Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_LONG).show();
             }
+        });
+
+        btnNight.setOnClickListener(v -> {
+            nightMode = !nightMode;
+            btnNight.setText(nightMode ? "🌕" : "🌙");
+            Toast.makeText(this, nightMode ? "Modo noche ON" : "Modo noche OFF", Toast.LENGTH_SHORT).show();
         });
 
         btnEq.setOnClickListener(v ->

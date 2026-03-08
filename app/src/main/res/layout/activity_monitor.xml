@@ -65,6 +65,11 @@
             android:src="@android:drawable/ic_menu_camera"
             android:background="#1A1A1A" android:tint="#00E676" android:padding="8dp"/>
 
+        <Button android:id="@+id/btnNight"
+            android:layout_width="44dp" android:layout_height="44dp"
+            android:text="🌙" android:textSize="18sp"
+            android:background="#1A1A1A" android:padding="4dp"/>
+
         <Button android:id="@+id/btnEq"
             android:layout_width="44dp" android:layout_height="44dp"
             android:text="EQ" android:textColor="#00E676" android:textSize="11sp"
@@ -87,76 +92,56 @@
             android:paddingStart="8dp"
             android:paddingEnd="8dp">
 
-            <!-- Band 0: 32Hz -->
             <LinearLayout android:layout_width="52dp" android:layout_height="match_parent" android:orientation="vertical" android:gravity="center">
                 <SeekBar android:id="@+id/seekBand0" android:layout_width="180dp" android:layout_height="36dp" android:rotation="270" android:progressTint="#00E676" android:thumbTint="#00E676"/>
                 <TextView android:id="@+id/tvBand0" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#00E676" android:textSize="9sp" android:fontFamily="monospace" android:layout_marginTop="16dp"/>
                 <TextView android:id="@+id/tvGain0" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#555555" android:textSize="8sp" android:fontFamily="monospace" android:text="0dB"/>
             </LinearLayout>
-
-            <!-- Band 1: 64Hz -->
             <LinearLayout android:layout_width="52dp" android:layout_height="match_parent" android:orientation="vertical" android:gravity="center">
                 <SeekBar android:id="@+id/seekBand1" android:layout_width="180dp" android:layout_height="36dp" android:rotation="270" android:progressTint="#00E676" android:thumbTint="#00E676"/>
                 <TextView android:id="@+id/tvBand1" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#00E676" android:textSize="9sp" android:fontFamily="monospace" android:layout_marginTop="16dp"/>
                 <TextView android:id="@+id/tvGain1" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#555555" android:textSize="8sp" android:fontFamily="monospace" android:text="0dB"/>
             </LinearLayout>
-
-            <!-- Band 2: 125Hz -->
             <LinearLayout android:layout_width="52dp" android:layout_height="match_parent" android:orientation="vertical" android:gravity="center">
                 <SeekBar android:id="@+id/seekBand2" android:layout_width="180dp" android:layout_height="36dp" android:rotation="270" android:progressTint="#00E676" android:thumbTint="#00E676"/>
                 <TextView android:id="@+id/tvBand2" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#00E676" android:textSize="9sp" android:fontFamily="monospace" android:layout_marginTop="16dp"/>
                 <TextView android:id="@+id/tvGain2" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#555555" android:textSize="8sp" android:fontFamily="monospace" android:text="0dB"/>
             </LinearLayout>
-
-            <!-- Band 3: 250Hz -->
             <LinearLayout android:layout_width="52dp" android:layout_height="match_parent" android:orientation="vertical" android:gravity="center">
                 <SeekBar android:id="@+id/seekBand3" android:layout_width="180dp" android:layout_height="36dp" android:rotation="270" android:progressTint="#00E676" android:thumbTint="#00E676"/>
                 <TextView android:id="@+id/tvBand3" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#00E676" android:textSize="9sp" android:fontFamily="monospace" android:layout_marginTop="16dp"/>
                 <TextView android:id="@+id/tvGain3" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#555555" android:textSize="8sp" android:fontFamily="monospace" android:text="0dB"/>
             </LinearLayout>
-
-            <!-- Band 4: 500Hz -->
             <LinearLayout android:layout_width="52dp" android:layout_height="match_parent" android:orientation="vertical" android:gravity="center">
                 <SeekBar android:id="@+id/seekBand4" android:layout_width="180dp" android:layout_height="36dp" android:rotation="270" android:progressTint="#00E676" android:thumbTint="#00E676"/>
                 <TextView android:id="@+id/tvBand4" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#00E676" android:textSize="9sp" android:fontFamily="monospace" android:layout_marginTop="16dp"/>
                 <TextView android:id="@+id/tvGain4" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#555555" android:textSize="8sp" android:fontFamily="monospace" android:text="0dB"/>
             </LinearLayout>
-
-            <!-- Band 5: 1kHz -->
             <LinearLayout android:layout_width="52dp" android:layout_height="match_parent" android:orientation="vertical" android:gravity="center">
                 <SeekBar android:id="@+id/seekBand5" android:layout_width="180dp" android:layout_height="36dp" android:rotation="270" android:progressTint="#00E676" android:thumbTint="#00E676"/>
                 <TextView android:id="@+id/tvBand5" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#00E676" android:textSize="9sp" android:fontFamily="monospace" android:layout_marginTop="16dp"/>
                 <TextView android:id="@+id/tvGain5" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#555555" android:textSize="8sp" android:fontFamily="monospace" android:text="0dB"/>
             </LinearLayout>
-
-            <!-- Band 6: 2kHz -->
             <LinearLayout android:layout_width="52dp" android:layout_height="match_parent" android:orientation="vertical" android:gravity="center">
                 <SeekBar android:id="@+id/seekBand6" android:layout_width="180dp" android:layout_height="36dp" android:rotation="270" android:progressTint="#00E676" android:thumbTint="#00E676"/>
                 <TextView android:id="@+id/tvBand6" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#00E676" android:textSize="9sp" android:fontFamily="monospace" android:layout_marginTop="16dp"/>
                 <TextView android:id="@+id/tvGain6" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#555555" android:textSize="8sp" android:fontFamily="monospace" android:text="0dB"/>
             </LinearLayout>
-
-            <!-- Band 7: 4kHz -->
             <LinearLayout android:layout_width="52dp" android:layout_height="match_parent" android:orientation="vertical" android:gravity="center">
                 <SeekBar android:id="@+id/seekBand7" android:layout_width="180dp" android:layout_height="36dp" android:rotation="270" android:progressTint="#00E676" android:thumbTint="#00E676"/>
                 <TextView android:id="@+id/tvBand7" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#00E676" android:textSize="9sp" android:fontFamily="monospace" android:layout_marginTop="16dp"/>
                 <TextView android:id="@+id/tvGain7" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#555555" android:textSize="8sp" android:fontFamily="monospace" android:text="0dB"/>
             </LinearLayout>
-
-            <!-- Band 8: 8kHz -->
             <LinearLayout android:layout_width="52dp" android:layout_height="match_parent" android:orientation="vertical" android:gravity="center">
                 <SeekBar android:id="@+id/seekBand8" android:layout_width="180dp" android:layout_height="36dp" android:rotation="270" android:progressTint="#00E676" android:thumbTint="#00E676"/>
                 <TextView android:id="@+id/tvBand8" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#00E676" android:textSize="9sp" android:fontFamily="monospace" android:layout_marginTop="16dp"/>
                 <TextView android:id="@+id/tvGain8" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#555555" android:textSize="8sp" android:fontFamily="monospace" android:text="0dB"/>
             </LinearLayout>
-
-            <!-- Band 9: 16kHz -->
             <LinearLayout android:layout_width="52dp" android:layout_height="match_parent" android:orientation="vertical" android:gravity="center">
                 <SeekBar android:id="@+id/seekBand9" android:layout_width="180dp" android:layout_height="36dp" android:rotation="270" android:progressTint="#00E676" android:thumbTint="#00E676"/>
                 <TextView android:id="@+id/tvBand9" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#00E676" android:textSize="9sp" android:fontFamily="monospace" android:layout_marginTop="16dp"/>
                 <TextView android:id="@+id/tvGain9" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#555555" android:textSize="8sp" android:fontFamily="monospace" android:text="0dB"/>
             </LinearLayout>
-
         </LinearLayout>
     </HorizontalScrollView>
 </LinearLayout>
