@@ -36,10 +36,16 @@ import java.util.concurrent.TimeUnit;
 
 public class MonitorActivity extends AppCompatActivity implements AudioService.Callback {
 
-    private static final int PORT_VIDEO       = 9998;
-    private static final int PORT_COMMAND     = 9997;
-    private static final int VIDEO_QUEUE_SIZE = 2;
-    private static final int VIDEO_TIMEOUT_MS = 8000;
+    private static final int PORT_VIDEO        = 9998;
+    private static final int PORT_COMMAND      = 9997;
+    private static final int VIDEO_QUEUE_SIZE  = 2;
+
+    // Tailscale-friendly timeouts (más generosos que WiFi local)
+    private static final int CONNECT_TIMEOUT   = 15000; // 15s para datos móviles + Tailscale relay
+    private static final int VIDEO_TIMEOUT_MS  = 20000; // 20s watchdog
+    private static final int SO_TIMEOUT        = 20000; // 20s socket read
+    private static final int CMD_TIMEOUT       = 5000;  // 5s para comandos
+    private static final int RECONNECT_DELAY   = 4000;  // 4s entre reintentos
 
     private String  deviceName, deviceIp;
     private int     sampleRate, audioMode;
@@ -59,11 +65,14 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
     private boolean      serviceBound = false;
 
     // Video
-    private volatile boolean running       = false;
+    private volatile boolean running        = false;
     private volatile boolean videoConnected = false;
     private volatile long    lastFrameTime  = 0;
     private android.graphics.Bitmap lastFrame = null;
     private final BlockingQueue<byte[]> videoQueue = new ArrayBlockingQueue<>(VIDEO_QUEUE_SIZE);
+
+    // Referencia al socket de video para cerrarlo cuando video se desactiva
+    private volatile Socket videoSocket = null;
 
     // Network / Screen
     private ConnectivityManager.NetworkCallback networkCallback;
@@ -152,6 +161,9 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
         super.onDestroy();
         running = false;
         videoQueue.clear();
+        // Cerrar socket de video al salir
+        Socket vs = videoSocket;
+        if (vs != null) { try { vs.close(); } catch (Exception ignored) {} videoSocket = null; }
         stopVideoWatchdog();
         unregisterNetworkCallback();
         unregisterScreenReceiver();
@@ -180,6 +192,9 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
                     if (videoEnabled && running) {
                         videoQueue.clear();
                         lastFrame = null;
+                        // Cerrar socket → Menu Claro libera cámara
+                        Socket vs = videoSocket;
+                        if (vs != null) { try { vs.close(); } catch (Exception ignored) {} videoSocket = null; }
                         runOnUiThread(() -> {
                             ivVideo.setImageBitmap(null);
                             ivVideo.setBackgroundColor(0xFF0A1A0A);
@@ -250,6 +265,9 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
                 if (elapsed > VIDEO_TIMEOUT_MS && videoConnected) {
                     videoConnected = false;
                     videoQueue.clear();
+                    // Forzar reconexión cerrando el socket
+                    Socket vs = videoSocket;
+                    if (vs != null) { try { vs.close(); } catch (Exception ignored) {} videoSocket = null; }
                     runOnUiThread(() -> setStatus("VIDEO TIMEOUT - RECONNECTING...", 0xFFFFAA00));
                 }
                 uiHandler.postDelayed(this, 3000);
@@ -282,9 +300,9 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
     private void sendInitialSettings() {
         new Thread(() -> {
             try {
-                Thread.sleep(1000);
+                Thread.sleep(3000); // 3s para que Tailscale relay se estabilice
                 Socket cmd = new Socket();
-                cmd.connect(new InetSocketAddress(deviceIp, PORT_COMMAND), 2000);
+                cmd.connect(new InetSocketAddress(deviceIp, PORT_COMMAND), CMD_TIMEOUT);
                 StringBuilder sb = new StringBuilder();
                 if (audioMode == 1) sb.append("AUDIO_STEREO\n"); else sb.append("AUDIO_MONO\n");
                 sb.append("SR_").append(sampleRate).append("\n");
@@ -300,7 +318,7 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
         new Thread(() -> {
             try {
                 Socket s = new Socket();
-                s.connect(new InetSocketAddress(deviceIp, PORT_COMMAND), 2000);
+                s.connect(new InetSocketAddress(deviceIp, PORT_COMMAND), CMD_TIMEOUT);
                 s.getOutputStream().write((cmd + "\n").getBytes());
                 s.getOutputStream().flush();
                 s.close();
@@ -314,13 +332,19 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
     private void startVideoReceiver() {
         new Thread(() -> {
             while (running) {
+                // Si video desactivado, esperar sin conectar
+                if (!videoEnabled) {
+                    try { Thread.sleep(500); } catch (InterruptedException e) { break; }
+                    continue;
+                }
                 Socket socket = null;
                 try {
                     socket = new Socket();
-                    socket.connect(new InetSocketAddress(deviceIp, PORT_VIDEO), 5000);
+                    socket.connect(new InetSocketAddress(deviceIp, PORT_VIDEO), CONNECT_TIMEOUT);
                     socket.setTcpNoDelay(true);
-                    socket.setSoTimeout(VIDEO_TIMEOUT_MS);
+                    socket.setSoTimeout(SO_TIMEOUT);
                     socket.setKeepAlive(true);
+                    videoSocket = socket; // Guardar referencia
                     DataInputStream in = new DataInputStream(socket.getInputStream());
                     videoConnected = true;
                     lastFrameTime  = System.currentTimeMillis();
@@ -330,16 +354,24 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
                         if (len <= 0 || len > 3_000_000) continue;
                         byte[] frame = new byte[len];
                         int total = 0;
-                        while (total < len) { int r = in.read(frame, total, len - total); if (r < 0) break; total += r; }
+                        while (total < len) {
+                            int r = in.read(frame, total, len - total);
+                            if (r < 0) break;
+                            total += r;
+                        }
                         lastFrameTime = System.currentTimeMillis();
                         if (!videoQueue.offer(frame)) { videoQueue.poll(); videoQueue.offer(frame); }
                     }
                 } catch (Exception ignored) {
                 } finally {
                     videoConnected = false;
+                    videoSocket = null;
                     videoQueue.clear();
                     if (socket != null) try { socket.close(); } catch (Exception ignored2) {}
-                    if (running) try { Thread.sleep(2000); } catch (InterruptedException e) { break; }
+                    if (running && videoEnabled) {
+                        runOnUiThread(() -> setStatus("RECONNECTING...", 0xFFFFAA00));
+                        try { Thread.sleep(RECONNECT_DELAY); } catch (InterruptedException e) { break; }
+                    }
                 }
             }
         }, "VideoReceiver").start();
@@ -353,7 +385,8 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
                     if (frame != null) {
                         android.graphics.BitmapFactory.Options opts = new android.graphics.BitmapFactory.Options();
                         opts.inPreferredConfig = android.graphics.Bitmap.Config.RGB_565;
-                        android.graphics.Bitmap bmp = android.graphics.BitmapFactory.decodeByteArray(frame, 0, frame.length, opts);
+                        android.graphics.Bitmap bmp = android.graphics.BitmapFactory.decodeByteArray(
+                                frame, 0, frame.length, opts);
                         if (bmp != null) {
                             if (nightMode) bmp = applyNightFilter(bmp);
                             lastFrame = bmp;
@@ -376,8 +409,8 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
         android.graphics.Canvas canvas = new android.graphics.Canvas(out);
         float brightness = 80f;
         float contrast   = 1.4f;
-        float scale = contrast;
-        float translate = (-(contrast - 1) * 128f) + brightness;
+        float scale      = contrast;
+        float translate  = (-(contrast - 1) * 128f) + brightness;
         android.graphics.ColorMatrix cm = new android.graphics.ColorMatrix(new float[]{
             scale, 0, 0, 0, translate,
             0, scale, 0, 0, translate,
@@ -474,7 +507,11 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
             sendCommand(nw ? "VIDEO_ON" : "VIDEO_OFF");
             btnVideoToggle.setColorFilter(nw ? 0xFF00E676 : 0xFFFF3D3D);
             if (!nw) {
-                videoQueue.clear(); lastFrame = null;
+                videoQueue.clear();
+                lastFrame = null;
+                // Cerrar socket → Menu Claro libera cámara → LED puede apagar
+                Socket vs = videoSocket;
+                if (vs != null) { try { vs.close(); } catch (Exception ignored) {} videoSocket = null; }
                 ivVideo.setImageBitmap(null);
                 ivVideo.setBackgroundColor(0xFF0A1A0A);
                 stopVideoWatchdog();
@@ -496,7 +533,9 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
         btnAudioToggle.setColorFilter(0xFF00E676);
 
         btnScreenshot.setOnClickListener(v -> {
-            if (lastFrame == null) { Toast.makeText(this, "No hay video activo", Toast.LENGTH_SHORT).show(); return; }
+            if (lastFrame == null) {
+                Toast.makeText(this, "No hay video activo", Toast.LENGTH_SHORT).show(); return;
+            }
             try {
                 File dir = new File(getExternalFilesDir(null), "Screenshots");
                 if (!dir.exists()) dir.mkdirs();
