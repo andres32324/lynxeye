@@ -1,11 +1,15 @@
 package com.lynxeye;
 
+import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.ServiceConnection;
-import android.media.AudioFormat;
-import android.media.AudioTrack;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
+import android.net.NetworkRequest;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
@@ -32,9 +36,10 @@ import java.util.concurrent.TimeUnit;
 
 public class MonitorActivity extends AppCompatActivity implements AudioService.Callback {
 
-    private static final int PORT_VIDEO   = 9998;
-    private static final int PORT_COMMAND = 9997;
+    private static final int PORT_VIDEO       = 9998;
+    private static final int PORT_COMMAND     = 9997;
     private static final int VIDEO_QUEUE_SIZE = 2;
+    private static final int VIDEO_TIMEOUT_MS = 8000; // 8s sin frames = reconectar
 
     private String  deviceName, deviceIp;
     private int     sampleRate, audioMode;
@@ -54,13 +59,18 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
     // Video
     private volatile boolean running        = false;
     private volatile boolean videoConnected = false;
+    private volatile long    lastFrameTime  = 0;
     private android.graphics.Bitmap lastFrame = null;
     private final BlockingQueue<byte[]> videoQueue = new ArrayBlockingQueue<>(VIDEO_QUEUE_SIZE);
+
+    // Network monitor
+    private ConnectivityManager.NetworkCallback networkCallback;
+    private Handler  uiHandler     = new Handler();
+    private Runnable videoWatchdog;
 
     // Recording UI
     private boolean  isRecording = false;
     private long     recordingStart;
-    private Handler  uiHandler = new Handler();
     private Runnable recTimeUpdater;
 
     // ─── Service Connection ───────────────────────────────
@@ -68,29 +78,19 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
         @Override
         public void onServiceConnected(ComponentName name, IBinder binder) {
             audioService = ((AudioService.AudioBinder) binder).getService();
-            serviceBound  = true;
+            serviceBound = true;
             audioService.setCallback(MonitorActivity.this);
-
-            // Start audio if not already running for this device
             if (!audioService.isRunning() || !deviceIp.equals(audioService.getDeviceIp())) {
-                audioService.startMonitoring(
-                    deviceIp, deviceName, sampleRate, audioMode,
-                    AppSettings.isNoiseSuppression(MonitorActivity.this)
-                );
+                audioService.startMonitoring(deviceIp, deviceName, sampleRate, audioMode,
+                        AppSettings.isNoiseSuppression(MonitorActivity.this));
                 sendInitialSettings();
             }
-
-            // Restore EQ state
             restoreEqState();
-
-            // Restore audio button color
             btnAudioToggle.setColorFilter(audioService.audioEnabled ? 0xFF00E676 : 0xFFFF3D3D);
         }
-
         @Override
         public void onServiceDisconnected(ComponentName name) {
-            serviceBound = false;
-            audioService = null;
+            serviceBound = false; audioService = null;
         }
     };
 
@@ -125,20 +125,21 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
         setupEqualizer();
         setupButtons();
 
-        // Bind to AudioService
         Intent svcIntent = new Intent(this, AudioService.class);
         startService(svcIntent);
         bindService(svcIntent, serviceConn, Context.BIND_AUTO_CREATE);
 
-        // Start video
         running = true;
         if (videoEnabled) {
             ivVideo.setBackgroundColor(0xFF111111);
             startVideoReceiver();
             startVideoRenderer();
+            startVideoWatchdog();
         } else {
             ivVideo.setBackgroundColor(0xFF0A1A0A);
         }
+
+        registerNetworkCallback();
     }
 
     @Override
@@ -146,6 +147,8 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
         super.onDestroy();
         running = false;
         videoQueue.clear();
+        stopVideoWatchdog();
+        unregisterNetworkCallback();
         if (serviceBound) {
             audioService.setCallback(null);
             unbindService(serviceConn);
@@ -155,11 +158,68 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
 
     @Override
     public void onBackPressed() {
-        // Go back to MainActivity - service keeps audio running
         Intent intent = new Intent(this, MainActivity.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         startActivity(intent);
         finish();
+    }
+
+    // ─── Network Monitor ──────────────────────────────────
+    private void registerNetworkCallback() {
+        try {
+            ConnectivityManager cm = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
+            NetworkRequest req = new NetworkRequest.Builder()
+                    .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET).build();
+            networkCallback = new ConnectivityManager.NetworkCallback() {
+                @Override
+                public void onAvailable(Network network) {
+                    // WiFi volvió - reconectar video
+                    if (running && videoEnabled) {
+                        videoQueue.clear();
+                        runOnUiThread(() -> setStatus("RECONNECTING...", 0xFFFFAA00));
+                    }
+                    // AudioService reconecta solo por su loop interno
+                }
+                @Override
+                public void onLost(Network network) {
+                    runOnUiThread(() -> setStatus("NO NETWORK", 0xFFFF3D3D));
+                }
+            };
+            cm.registerNetworkCallback(req, networkCallback);
+        } catch (Exception ignored) {}
+    }
+
+    private void unregisterNetworkCallback() {
+        try {
+            if (networkCallback != null) {
+                ConnectivityManager cm = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
+                cm.unregisterNetworkCallback(networkCallback);
+                networkCallback = null;
+            }
+        } catch (Exception ignored) {}
+    }
+
+    // ─── Video Watchdog ───────────────────────────────────
+    private void startVideoWatchdog() {
+        lastFrameTime = System.currentTimeMillis();
+        videoWatchdog = new Runnable() {
+            @Override public void run() {
+                if (!running || !videoEnabled) return;
+                long elapsed = System.currentTimeMillis() - lastFrameTime;
+                if (elapsed > VIDEO_TIMEOUT_MS && videoConnected) {
+                    // Video colgado - forzar reconexión
+                    videoConnected = false;
+                    videoQueue.clear();
+                    runOnUiThread(() -> setStatus("VIDEO TIMEOUT - RECONNECTING...", 0xFFFFAA00));
+                }
+                uiHandler.postDelayed(this, 3000);
+            }
+        };
+        uiHandler.postDelayed(videoWatchdog, 3000);
+    }
+
+    private void stopVideoWatchdog() {
+        if (videoWatchdog != null) uiHandler.removeCallbacks(videoWatchdog);
     }
 
     // ─── AudioService.Callback ────────────────────────────
@@ -167,11 +227,9 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
     public void onAudioConnected(boolean connected) {
         runOnUiThread(() -> {
             if (connected || videoConnected) {
-                tvStatus.setText("⬤  CONNECTED");
-                tvStatus.setTextColor(0xFF00E676);
+                tvStatus.setText("⬤  CONNECTED"); tvStatus.setTextColor(0xFF00E676);
             } else {
-                tvStatus.setText("⬤  LOST SIGNAL");
-                tvStatus.setTextColor(0xFFFF3D3D);
+                tvStatus.setText("⬤  LOST SIGNAL"); tvStatus.setTextColor(0xFFFF3D3D);
             }
         });
     }
@@ -221,10 +279,11 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
                     socket = new Socket();
                     socket.connect(new InetSocketAddress(deviceIp, PORT_VIDEO), 5000);
                     socket.setTcpNoDelay(true);
-                    socket.setSoTimeout(10000);
+                    socket.setSoTimeout(VIDEO_TIMEOUT_MS);
                     socket.setKeepAlive(true);
                     DataInputStream in = new DataInputStream(socket.getInputStream());
                     videoConnected = true;
+                    lastFrameTime  = System.currentTimeMillis();
                     runOnUiThread(() -> { tvStatus.setText("⬤  CONNECTED"); tvStatus.setTextColor(0xFF00E676); });
                     while (running && !socket.isClosed()) {
                         int len = in.readInt();
@@ -232,6 +291,7 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
                         byte[] frame = new byte[len];
                         int total = 0;
                         while (total < len) { int r = in.read(frame, total, len - total); if (r < 0) break; total += r; }
+                        lastFrameTime = System.currentTimeMillis(); // update watchdog
                         if (!videoQueue.offer(frame)) { videoQueue.poll(); videoQueue.offer(frame); }
                     }
                 } catch (Exception ignored) {
@@ -275,8 +335,7 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
         for (int i = 0; i < DspEqualizer.BANDS; i++) {
             ((TextView) findViewById(labelIds[i])).setText(DspEqualizer.LABELS[i]);
             SeekBar sb = findViewById(seekIds[i]);
-            sb.setMax(240);
-            sb.setProgress(120);
+            sb.setMax(240); sb.setProgress(120);
             final int band = i;
             final TextView tvGain = findViewById(gainIds[i]);
             sb.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
@@ -299,9 +358,8 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
                          R.id.tvGain5,R.id.tvGain6,R.id.tvGain7,R.id.tvGain8,R.id.tvGain9};
         for (int i = 0; i < DspEqualizer.BANDS; i++) {
             float db = audioService.getGain(i);
-            SeekBar sb = findViewById(seekIds[i]);
-            sb.setProgress((int)(db * 10 + 120));
-            ((TextView)findViewById(gainIds[i])).setText(
+            ((SeekBar) findViewById(seekIds[i])).setProgress((int)(db * 10 + 120));
+            ((TextView) findViewById(gainIds[i])).setText(
                     String.format(Locale.getDefault(), "%+.0fdB", db));
         }
     }
@@ -350,10 +408,12 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
                 videoQueue.clear(); lastFrame = null;
                 ivVideo.setImageBitmap(null);
                 ivVideo.setBackgroundColor(0xFF0A1A0A);
+                stopVideoWatchdog();
             } else {
                 ivVideo.setBackgroundColor(0xFF111111);
                 startVideoReceiver();
                 startVideoRenderer();
+                startVideoWatchdog();
             }
         });
         btnVideoToggle.setColorFilter(videoEnabled ? 0xFF00E676 : 0xFFFF3D3D);
