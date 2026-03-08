@@ -15,6 +15,7 @@ import android.media.audiofx.NoiseSuppressor;
 import android.os.Binder;
 import android.os.Build;
 import android.os.IBinder;
+import android.os.PowerManager;
 import androidx.core.app.NotificationCompat;
 
 import java.io.InputStream;
@@ -59,8 +60,10 @@ public class AudioService extends Service {
     private AudioManager      audioManager;
     private AudioFocusRequest audioFocusRequest;
 
+    // WakeLock solo activo cuando transmite
+    private PowerManager.WakeLock wakeLock;
+
     private final BlockingQueue<byte[]> audioQueue = new ArrayBlockingQueue<>(QUEUE_SIZE);
-    // Referencia al socket activo para poder cerrarlo desde setAudioEnabled
     private volatile Socket audioSocket = null;
 
     private File             recordingFile;
@@ -72,7 +75,6 @@ public class AudioService extends Service {
     }
     private Callback callback;
 
-    // ─── Lifecycle ────────────────────────────────────────
     @Override public IBinder onBind(Intent intent) { return binder; }
 
     @Override
@@ -103,7 +105,7 @@ public class AudioService extends Service {
         if (noiseSup) setupNoiseSuppressor();
         dspEq = new DspEqualizer(sr);
         running = true;
-        audioEnabled = true; // Siempre arranca con audio habilitado
+        audioEnabled = true;
         startAudioReceiver();
         startAudioPlayer();
         showNotification("Conectando...");
@@ -116,15 +118,15 @@ public class AudioService extends Service {
         audioEnabled = enabled;
         if (!enabled) {
             audioQueue.clear();
-            // Cerrar socket activo → Menu Claro detecta desconexión → apaga mic → LED apaga
             Socket s = audioSocket;
             if (s != null && !s.isClosed()) {
                 try { s.close(); } catch (Exception ignored) {}
             }
             audioSocket = null;
+            // WakeLock innecesario si no hay audio
+            releaseWakeLock();
             updateNotification("Audio pausado");
         } else {
-            // AudioReceiver reconecta automáticamente cuando audioEnabled=true
             updateNotification("Reconectando...");
         }
     }
@@ -133,6 +135,20 @@ public class AudioService extends Service {
     public float getGain(int band) { return dspEq != null ? dspEq.getGain(band) : 0; }
     public boolean isRunning() { return running; }
     public String getDeviceIp() { return deviceIp; }
+
+    // ─── WakeLock inteligente ─────────────────────────────
+    private void acquireWakeLock() {
+        if (wakeLock != null && wakeLock.isHeld()) return;
+        PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
+        wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "LynxEye::AudioWakeLock");
+        wakeLock.acquire();
+    }
+
+    private void releaseWakeLock() {
+        if (wakeLock != null && wakeLock.isHeld()) {
+            wakeLock.release();
+        }
+    }
 
     // ─── Recording ────────────────────────────────────────
     public boolean startRecording(File dir) {
@@ -211,7 +227,6 @@ public class AudioService extends Service {
     private void startAudioReceiver() {
         new Thread(() -> {
             while (running) {
-                // Si audio está deshabilitado, esperar sin conectar
                 if (!audioEnabled) {
                     try { Thread.sleep(500); } catch (InterruptedException e) { break; }
                     continue;
@@ -219,11 +234,15 @@ public class AudioService extends Service {
                 Socket socket = null;
                 try {
                     socket = new Socket();
-                    socket.connect(new InetSocketAddress(deviceIp, PORT_AUDIO), 5000);
+                    socket.connect(new InetSocketAddress(deviceIp, PORT_AUDIO), 15000);
                     socket.setTcpNoDelay(true);
-                    socket.setSoTimeout(10000);
+                    socket.setSoTimeout(20000);
                     socket.setKeepAlive(true);
-                    audioSocket = socket; // Guardar referencia
+                    audioSocket = socket;
+
+                    // WakeLock activo solo cuando hay audio 🔋
+                    acquireWakeLock();
+
                     InputStream in = socket.getInputStream();
                     byte[] buf = new byte[4096];
                     audioConnected = true;
@@ -244,10 +263,12 @@ public class AudioService extends Service {
                     audioSocket = null;
                     notifyCallback(false);
                     audioQueue.clear();
+                    // WakeLock liberar cuando no hay audio 🔋
+                    releaseWakeLock();
                     if (socket != null) try { socket.close(); } catch (Exception ignored2) {}
                     if (running && audioEnabled) {
                         updateNotification("Reconectando...");
-                        try { Thread.sleep(2000); } catch (InterruptedException e) { break; }
+                        try { Thread.sleep(4000); } catch (InterruptedException e) { break; }
                     } else {
                         updateNotification("Audio pausado");
                     }
@@ -286,6 +307,7 @@ public class AudioService extends Service {
         if (audioManager != null && audioFocusRequest != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             audioManager.abandonAudioFocusRequest(audioFocusRequest);
         }
+        releaseWakeLock();
         stopForeground(true);
     }
 
@@ -301,7 +323,7 @@ public class AudioService extends Service {
 
     private void updateNotification(String text) {
         NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-        nm.notify(NOTIF_ID, buildNotification(text));
+        if (nm != null) nm.notify(NOTIF_ID, buildNotification(text));
     }
 
     private Notification buildNotification(String text) {

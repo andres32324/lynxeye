@@ -47,7 +47,7 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
     private static final int SO_TIMEOUT       = 20000;
     private static final int CMD_TIMEOUT      = 5000;
     private static final int RECONNECT_DELAY  = 4000;
-    private static final int PING_INTERVAL    = 30000; // 30s heartbeat
+    private static final int PING_INTERVAL    = 60000; // 60s heartbeat
 
     private String  deviceName, deviceIp;
     private int     sampleRate, audioMode;
