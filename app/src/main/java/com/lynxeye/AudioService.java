@@ -38,67 +38,56 @@ public class AudioService extends Service {
     private static final int    PORT_AUDIO    = 9999;
     private static final int    QUEUE_SIZE    = 3;
 
-    // ─── Binder ───────────────────────────────────────────
     public class AudioBinder extends Binder {
         public AudioService getService() { return AudioService.this; }
     }
     private final IBinder binder = new AudioBinder();
 
-    // ─── State ────────────────────────────────────────────
     private String  deviceIp;
     private String  deviceName;
     private int     sampleRate;
     private int     audioMode;
 
-    private volatile boolean running       = false;
-    public  volatile boolean audioEnabled  = true;
+    private volatile boolean running        = false;
+    public  volatile boolean audioEnabled   = true;
     public  volatile boolean audioConnected = false;
-    private volatile boolean isRecording   = false;
+    private volatile boolean isRecording    = false;
 
-    private AudioTrack      audioTrack;
-    private DspEqualizer    dspEq;
-    private NoiseSuppressor noiseSuppressor;
-    private AudioManager    audioManager;
+    private AudioTrack        audioTrack;
+    private DspEqualizer      dspEq;
+    private NoiseSuppressor   noiseSuppressor;
+    private AudioManager      audioManager;
     private AudioFocusRequest audioFocusRequest;
 
     private final BlockingQueue<byte[]> audioQueue = new ArrayBlockingQueue<>(QUEUE_SIZE);
+    // Referencia al socket activo para poder cerrarlo desde setAudioEnabled
+    private volatile Socket audioSocket = null;
 
-    // Recording
     private File             recordingFile;
     private FileOutputStream recordingStream;
     private long             totalAudioBytes = 0;
 
-    // Callback to UI
     public interface Callback {
         void onAudioConnected(boolean connected);
     }
     private Callback callback;
 
     // ─── Lifecycle ────────────────────────────────────────
-    @Override
-    public IBinder onBind(Intent intent) { return binder; }
+    @Override public IBinder onBind(Intent intent) { return binder; }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent != null && "STOP".equals(intent.getAction())) {
-            stopSelf();
-            return START_NOT_STICKY;
+            stopSelf(); return START_NOT_STICKY;
         }
         return START_STICKY;
     }
 
-    @Override
-    public void onDestroy() {
-        super.onDestroy();
-        stopAudio();
-    }
+    @Override public void onDestroy() { super.onDestroy(); stopAudio(); }
 
     // ─── Public API ───────────────────────────────────────
     public void startMonitoring(String ip, String name, int sr, int mode, boolean noiseSup) {
-        // If already running for same device, do nothing
         if (running && ip.equals(deviceIp)) return;
-
-        // If running for different device, stop first
         if (running) {
             running = false;
             audioQueue.clear();
@@ -106,42 +95,42 @@ public class AudioService extends Service {
             if (audioTrack != null) { try { audioTrack.stop(); audioTrack.release(); } catch (Exception ignored) {} audioTrack = null; }
             if (noiseSuppressor != null) { try { noiseSuppressor.release(); } catch (Exception ignored) {} noiseSuppressor = null; }
         }
-
         this.deviceIp   = ip;
         this.deviceName = name;
         this.sampleRate = sr;
         this.audioMode  = mode;
-
         setupAudioTrack();
         if (noiseSup) setupNoiseSuppressor();
         dspEq = new DspEqualizer(sr);
-
         running = true;
+        audioEnabled = true; // Siempre arranca con audio habilitado
         startAudioReceiver();
         startAudioPlayer();
         showNotification("Conectando...");
     }
 
-    public void stopMonitoring() {
-        stopSelf();
-    }
-
+    public void stopMonitoring() { stopSelf(); }
     public void setCallback(Callback cb) { this.callback = cb; }
 
     public void setAudioEnabled(boolean enabled) {
         audioEnabled = enabled;
-        if (!enabled) audioQueue.clear();
-        updateNotification(enabled ? "Audio activo" : "Audio pausado");
+        if (!enabled) {
+            audioQueue.clear();
+            // Cerrar socket activo → Menu Claro detecta desconexión → apaga mic → LED apaga
+            Socket s = audioSocket;
+            if (s != null && !s.isClosed()) {
+                try { s.close(); } catch (Exception ignored) {}
+            }
+            audioSocket = null;
+            updateNotification("Audio pausado");
+        } else {
+            // AudioReceiver reconecta automáticamente cuando audioEnabled=true
+            updateNotification("Reconectando...");
+        }
     }
 
-    public void setGain(int band, float db) {
-        if (dspEq != null) dspEq.setGain(band, db);
-    }
-
-    public float getGain(int band) {
-        return dspEq != null ? dspEq.getGain(band) : 0f;
-    }
-
+    public void setGain(int band, float db) { if (dspEq != null) dspEq.setGain(band, db); }
+    public float getGain(int band) { return dspEq != null ? dspEq.getGain(band) : 0; }
     public boolean isRunning() { return running; }
     public String getDeviceIp() { return deviceIp; }
 
@@ -150,7 +139,7 @@ public class AudioService extends Service {
         try {
             String fn = "LynxEye_" + new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss",
                     Locale.getDefault()).format(new Date()) + ".wav";
-            recordingFile  = new File(dir, fn);
+            recordingFile   = new File(dir, fn);
             recordingStream = new FileOutputStream(recordingFile);
             int ch = audioMode == 1 ? 2 : 1;
             writeWavHeader(recordingStream, 0, sampleRate, ch);
@@ -195,7 +184,7 @@ public class AudioService extends Service {
 
     private void setupAudioTrack() {
         requestAudioFocus();
-        int ch = audioMode == 1 ? AudioFormat.CHANNEL_OUT_STEREO : AudioFormat.CHANNEL_OUT_MONO;
+        int ch  = audioMode == 1 ? AudioFormat.CHANNEL_OUT_STEREO : AudioFormat.CHANNEL_OUT_MONO;
         int min = AudioTrack.getMinBufferSize(sampleRate, ch, AudioFormat.ENCODING_PCM_16BIT);
         audioTrack = new AudioTrack.Builder()
                 .setAudioAttributes(new AudioAttributes.Builder()
@@ -218,9 +207,15 @@ public class AudioService extends Service {
         } catch (Exception ignored) {}
     }
 
+    // ─── Audio Receiver ───────────────────────────────────
     private void startAudioReceiver() {
         new Thread(() -> {
             while (running) {
+                // Si audio está deshabilitado, esperar sin conectar
+                if (!audioEnabled) {
+                    try { Thread.sleep(500); } catch (InterruptedException e) { break; }
+                    continue;
+                }
                 Socket socket = null;
                 try {
                     socket = new Socket();
@@ -228,6 +223,7 @@ public class AudioService extends Service {
                     socket.setTcpNoDelay(true);
                     socket.setSoTimeout(10000);
                     socket.setKeepAlive(true);
+                    audioSocket = socket; // Guardar referencia
                     InputStream in = socket.getInputStream();
                     byte[] buf = new byte[4096];
                     audioConnected = true;
@@ -245,16 +241,22 @@ public class AudioService extends Service {
                 } catch (Exception ignored) {
                 } finally {
                     audioConnected = false;
+                    audioSocket = null;
                     notifyCallback(false);
                     audioQueue.clear();
                     if (socket != null) try { socket.close(); } catch (Exception ignored2) {}
-                    updateNotification("Reconectando...");
-                    if (running) try { Thread.sleep(2000); } catch (InterruptedException e) { break; }
+                    if (running && audioEnabled) {
+                        updateNotification("Reconectando...");
+                        try { Thread.sleep(2000); } catch (InterruptedException e) { break; }
+                    } else {
+                        updateNotification("Audio pausado");
+                    }
                 }
             }
         }, "AudioReceiver").start();
     }
 
+    // ─── Audio Player ─────────────────────────────────────
     private void startAudioPlayer() {
         new Thread(() -> {
             while (running) {
@@ -276,6 +278,8 @@ public class AudioService extends Service {
     private void stopAudio() {
         running = false;
         audioQueue.clear();
+        Socket s = audioSocket;
+        if (s != null) { try { s.close(); } catch (Exception ignored) {} audioSocket = null; }
         if (isRecording) stopRecording();
         if (noiseSuppressor != null) { try { noiseSuppressor.release(); } catch (Exception ignored) {} }
         if (audioTrack != null) { try { audioTrack.stop(); audioTrack.release(); } catch (Exception ignored) {} }
@@ -293,10 +297,7 @@ public class AudioService extends Service {
     }
 
     // ─── Notification ─────────────────────────────────────
-    private void showNotification(String text) {
-        createChannel();
-        startForeground(NOTIF_ID, buildNotification(text));
-    }
+    private void showNotification(String text) { createChannel(); startForeground(NOTIF_ID, buildNotification(text)); }
 
     private void updateNotification(String text) {
         NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
@@ -308,20 +309,17 @@ public class AudioService extends Service {
         open.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
         PendingIntent openPi = PendingIntent.getActivity(this, 0, open,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-
         Intent stop = new Intent(this, AudioService.class);
         stop.setAction("STOP");
         PendingIntent stopPi = PendingIntent.getService(this, 1, stop,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-
         return new NotificationCompat.Builder(this, NOTIF_CHANNEL)
                 .setContentTitle("LynxEye — " + deviceName)
                 .setContentText(text)
                 .setSmallIcon(android.R.drawable.ic_btn_speak_now)
                 .setContentIntent(openPi)
                 .addAction(android.R.drawable.ic_delete, "Detener", stopPi)
-                .setOngoing(true)
-                .build();
+                .setOngoing(true).build();
     }
 
     private void createChannel() {
@@ -342,7 +340,7 @@ public class AudioService extends Service {
         h[12]='f';h[13]='m';h[14]='t';h[15]=' ';
         h[16]=16;h[20]=1;h[22]=(byte)ch;
         h[24]=(byte)sr;h[25]=(byte)(sr>>8);h[26]=(byte)(sr>>16);h[27]=(byte)(sr>>24);
-        long br=sr*ch*2L;
+        long br = (long)sr * ch * 2;
         h[28]=(byte)br;h[29]=(byte)(br>>8);h[30]=(byte)(br>>16);h[31]=(byte)(br>>24);
         h[32]=(byte)(ch*2);h[34]=16;
         h[36]='d';h[37]='a';h[38]='t';h[39]='a';
