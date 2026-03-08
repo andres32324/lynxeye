@@ -7,6 +7,8 @@ import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Intent;
 import android.media.AudioAttributes;
+import android.media.AudioFocusRequest;
+import android.media.AudioManager;
 import android.media.AudioFormat;
 import android.media.AudioTrack;
 import android.media.audiofx.NoiseSuppressor;
@@ -56,6 +58,8 @@ public class AudioService extends Service {
     private AudioTrack      audioTrack;
     private DspEqualizer    dspEq;
     private NoiseSuppressor noiseSuppressor;
+    private AudioManager    audioManager;
+    private AudioFocusRequest audioFocusRequest;
 
     private final BlockingQueue<byte[]> audioQueue = new ArrayBlockingQueue<>(QUEUE_SIZE);
 
@@ -161,7 +165,25 @@ public class AudioService extends Service {
     public boolean isRecording() { return isRecording; }
 
     // ─── Audio Setup ──────────────────────────────────────
+    private void requestAudioFocus() {
+        audioManager = (AudioManager) getSystemService(AUDIO_SERVICE);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            AudioAttributes attrs = new AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build();
+            audioFocusRequest = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+                    .setAudioAttributes(attrs)
+                    .setAcceptsDelayedFocusGain(true)
+                    .setOnAudioFocusChangeListener(focusChange -> {})
+                    .build();
+            audioManager.requestAudioFocus(audioFocusRequest);
+        } else {
+            audioManager.requestAudioFocus(null, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN);
+        }
+    }
+
     private void setupAudioTrack() {
+        requestAudioFocus();
         int ch = audioMode == 1 ? AudioFormat.CHANNEL_OUT_STEREO : AudioFormat.CHANNEL_OUT_MONO;
         int min = AudioTrack.getMinBufferSize(sampleRate, ch, AudioFormat.ENCODING_PCM_16BIT);
         audioTrack = new AudioTrack.Builder()
@@ -246,6 +268,9 @@ public class AudioService extends Service {
         if (isRecording) stopRecording();
         if (noiseSuppressor != null) { try { noiseSuppressor.release(); } catch (Exception ignored) {} }
         if (audioTrack != null) { try { audioTrack.stop(); audioTrack.release(); } catch (Exception ignored) {} }
+        if (audioManager != null && audioFocusRequest != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            audioManager.abandonAudioFocusRequest(audioFocusRequest);
+        }
         stopForeground(true);
     }
 
