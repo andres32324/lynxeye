@@ -1,6 +1,7 @@
 package com.lynxeye;
 
 import android.content.BroadcastReceiver;
+import android.os.PowerManager;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -65,6 +66,7 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
 
     // Network monitor
     private ConnectivityManager.NetworkCallback networkCallback;
+    private BroadcastReceiver screenReceiver;
     private Handler  uiHandler     = new Handler();
     private Runnable videoWatchdog;
 
@@ -140,6 +142,7 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
         }
 
         registerNetworkCallback();
+        registerScreenReceiver();
     }
 
     @Override
@@ -149,6 +152,7 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
         videoQueue.clear();
         stopVideoWatchdog();
         unregisterNetworkCallback();
+        unregisterScreenReceiver();
         if (serviceBound) {
             audioService.setCallback(null);
             unbindService(serviceConn);
