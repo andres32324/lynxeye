@@ -343,6 +343,7 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
                     float db = (p - 120) / 10f;
                     if (audioService != null) audioService.setGain(band, db);
                     tvGain.setText(String.format(Locale.getDefault(), "%+.0fdB", db));
+                    AppSettings.setEqGain(MonitorActivity.this, deviceIp, band, db);
                 }
                 @Override public void onStartTrackingTouch(SeekBar s) {}
                 @Override public void onStopTrackingTouch(SeekBar s) {}
@@ -357,7 +358,9 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
         int[] gainIds = {R.id.tvGain0,R.id.tvGain1,R.id.tvGain2,R.id.tvGain3,R.id.tvGain4,
                          R.id.tvGain5,R.id.tvGain6,R.id.tvGain7,R.id.tvGain8,R.id.tvGain9};
         for (int i = 0; i < DspEqualizer.BANDS; i++) {
-            float db = audioService.getGain(i);
+            // Load saved EQ for this device IP
+            float db = AppSettings.getEqGain(this, deviceIp, i);
+            audioService.setGain(i, db);
             ((SeekBar) findViewById(seekIds[i])).setProgress((int)(db * 10 + 120));
             ((TextView) findViewById(gainIds[i])).setText(
                     String.format(Locale.getDefault(), "%+.0fdB", db));

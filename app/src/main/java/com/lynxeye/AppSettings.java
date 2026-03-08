@@ -28,6 +28,14 @@ public class AppSettings {
     public static boolean isVisualizerEnabled(Context ctx) { return get(ctx).getBoolean("visualizer", true); }
     public static void setVisualizerEnabled(Context ctx, boolean v) { set(ctx).putBoolean("visualizer", v).apply(); }
 
+    // EQ per device - saved by IP
+    public static void setEqGain(Context ctx, String ip, int band, float db) {
+        set(ctx).putFloat("eq_" + ip.replace(".", "_") + "_" + band, db).apply();
+    }
+    public static float getEqGain(Context ctx, String ip, int band) {
+        return get(ctx).getFloat("eq_" + ip.replace(".", "_") + "_" + band, 0f);
+    }
+
     private static SharedPreferences get(Context ctx) { return ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE); }
     private static SharedPreferences.Editor set(Context ctx) { return get(ctx).edit(); }
 }
