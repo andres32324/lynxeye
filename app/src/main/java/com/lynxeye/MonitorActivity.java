@@ -49,7 +49,8 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
     private TextView    tvStatus, tvDeviceName, tvRecTime;
     private ImageView   ivVideo;
     private ImageButton btnRecord, btnSwitchCam, btnScreenshot, btnVideoToggle, btnAudioToggle;
-    private android.widget.Button btnEq, btnNight;
+    private android.widget.Button btnEq;
+    private ImageButton btnNight;
     private View        layoutEq;
     private volatile boolean nightMode = false;
 
@@ -513,13 +514,12 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
 
         btnNight.setOnClickListener(v -> {
             nightMode = !nightMode;
-            btnNight.setText("NIGHT");
-            btnNight.setTextColor(nightMode ? 0xFFFFFF00 : 0xFF00E676);
-            // Limpiar frame cacheado para forzar nuevo frame sin/con filtro
+            btnNight.setColorFilter(nightMode ? 0xFFFFFF00 : 0xFF00E676);
             lastFrame = null;
             runOnUiThread(() -> ivVideo.setImageBitmap(null));
             Toast.makeText(this, nightMode ? "Modo noche ON" : "Modo noche OFF", Toast.LENGTH_SHORT).show();
         });
+        btnNight.setColorFilter(0xFF00E676);
 
         btnEq.setOnClickListener(v ->
                 layoutEq.setVisibility(layoutEq.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE));
