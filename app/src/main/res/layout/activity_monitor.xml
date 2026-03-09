@@ -23,9 +23,9 @@
     </LinearLayout>
 
     <!-- Video Feed -->
-    <TextureView android:id="@+id/textureView"
+    <ImageView android:id="@+id/ivVideo"
         android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1"
-        android:background="#111111"/>
+        android:scaleType="fitCenter" android:background="#111111"/>
 
     <!-- Controls row -->
     <LinearLayout
@@ -65,10 +65,10 @@
             android:src="@android:drawable/ic_menu_camera"
             android:background="#1A1A1A" android:tint="#00E676" android:padding="8dp"/>
 
-        <Button android:id="@+id/btnNight"
+        <ImageButton android:id="@+id/btnNight"
             android:layout_width="44dp" android:layout_height="44dp"
-            android:text="🌙" android:textSize="18sp"
-            android:background="#1A1A1A" android:padding="4dp"/>
+            android:src="@android:drawable/ic_menu_compass"
+            android:background="#1A1A1A" android:tint="#00E676" android:padding="8dp"/>
 
         <Button android:id="@+id/btnEq"
             android:layout_width="44dp" android:layout_height="44dp"
