@@ -23,9 +23,9 @@
     </LinearLayout>
 
     <!-- Video Feed -->
-    <ImageView android:id="@+id/ivVideo"
+    <TextureView android:id="@+id/textureView"
         android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1"
-        android:scaleType="fitCenter" android:background="#111111"/>
+        android:background="#111111"/>
 
     <!-- Controls row -->
     <LinearLayout
