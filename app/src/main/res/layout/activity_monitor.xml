@@ -67,42 +67,36 @@
         <ImageButton android:id="@+id/btnRecord"
             android:layout_width="48dp" android:layout_height="48dp"
             android:src="@android:drawable/ic_btn_speak_now"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:colorFilter="#00E676"/>
+            android:background="?attr/selectableItemBackgroundBorderless"/>
 
         <ImageButton android:id="@+id/btnScreenshot"
             android:layout_width="48dp" android:layout_height="48dp"
             android:src="@android:drawable/ic_menu_camera"
             android:background="?attr/selectableItemBackgroundBorderless"
-            android:colorFilter="#00E676"
             android:layout_marginStart="8dp"/>
 
         <ImageButton android:id="@+id/btnVideoToggle"
             android:layout_width="48dp" android:layout_height="48dp"
             android:src="@android:drawable/ic_menu_view"
             android:background="?attr/selectableItemBackgroundBorderless"
-            android:colorFilter="#00E676"
             android:layout_marginStart="8dp"/>
 
         <ImageButton android:id="@+id/btnAudioToggle"
             android:layout_width="48dp" android:layout_height="48dp"
             android:src="@android:drawable/ic_lock_silent_mode_off"
             android:background="?attr/selectableItemBackgroundBorderless"
-            android:colorFilter="#00E676"
             android:layout_marginStart="8dp"/>
 
         <ImageButton android:id="@+id/btnSwitchCam"
             android:layout_width="48dp" android:layout_height="48dp"
             android:src="@android:drawable/ic_menu_rotate"
             android:background="?attr/selectableItemBackgroundBorderless"
-            android:colorFilter="#00E676"
             android:layout_marginStart="8dp"/>
 
         <ImageButton android:id="@+id/btnNight"
             android:layout_width="48dp" android:layout_height="48dp"
             android:src="@android:drawable/ic_menu_month"
             android:background="?attr/selectableItemBackgroundBorderless"
-            android:colorFilter="#00E676"
             android:layout_marginStart="8dp"/>
 
         <Button android:id="@+id/btnEq"
