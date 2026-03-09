@@ -5,6 +5,7 @@
     android:orientation="vertical"
     android:background="#0A0A0A">
 
+    <!-- Header -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="48dp"
@@ -21,10 +22,12 @@
             android:text="⬤  CONNECTING..."/>
     </LinearLayout>
 
-    <TextureView android:id="@+id/textureView"
+    <!-- Video Feed -->
+    <ImageView android:id="@+id/ivVideo"
         android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1"
-        android:background="#111111"/>
+        android:scaleType="fitCenter" android:background="#111111"/>
 
+    <!-- Controls row -->
     <LinearLayout
         android:layout_width="match_parent" android:layout_height="56dp"
         android:orientation="horizontal" android:gravity="center_vertical"
@@ -34,43 +37,61 @@
             android:layout_width="44dp" android:layout_height="44dp"
             android:src="@android:drawable/ic_btn_speak_now"
             android:background="#1A1A1A" android:tint="#00E676" android:padding="8dp"/>
+
         <TextView android:id="@+id/tvRecTime"
             android:layout_width="wrap_content" android:layout_height="wrap_content"
             android:textColor="#FF3D3D" android:textSize="13sp" android:fontFamily="monospace"
             android:paddingStart="6dp" android:visibility="gone" android:text="⏺ 00:00"/>
+
         <View android:layout_width="0dp" android:layout_height="1dp" android:layout_weight="1"/>
+
         <ImageButton android:id="@+id/btnScreenshot"
             android:layout_width="44dp" android:layout_height="44dp"
             android:src="@android:drawable/ic_menu_gallery"
             android:background="#1A1A1A" android:tint="#00E676" android:padding="8dp"/>
+
         <ImageButton android:id="@+id/btnVideoToggle"
             android:layout_width="44dp" android:layout_height="44dp"
             android:src="@android:drawable/ic_menu_view"
             android:background="#1A1A1A" android:tint="#00E676" android:padding="8dp"/>
+
         <ImageButton android:id="@+id/btnAudioToggle"
             android:layout_width="44dp" android:layout_height="44dp"
             android:src="@android:drawable/ic_btn_speak_now"
             android:background="#1A1A1A" android:tint="#00E676" android:padding="8dp"/>
+
         <ImageButton android:id="@+id/btnSwitchCam"
             android:layout_width="44dp" android:layout_height="44dp"
             android:src="@android:drawable/ic_menu_camera"
             android:background="#1A1A1A" android:tint="#00E676" android:padding="8dp"/>
+
         <Button android:id="@+id/btnNight"
             android:layout_width="44dp" android:layout_height="44dp"
             android:text="🌙" android:textSize="18sp"
             android:background="#1A1A1A" android:padding="4dp"/>
+
         <Button android:id="@+id/btnEq"
             android:layout_width="44dp" android:layout_height="44dp"
             android:text="EQ" android:textColor="#00E676" android:textSize="11sp"
             android:fontFamily="monospace" android:background="#1A1A1A" android:padding="4dp"/>
     </LinearLayout>
 
-    <HorizontalScrollView android:id="@+id/layoutEq"
-        android:layout_width="match_parent" android:layout_height="240dp"
-        android:background="#111111" android:visibility="gone">
-        <LinearLayout android:layout_width="wrap_content" android:layout_height="match_parent"
-            android:orientation="horizontal" android:gravity="center"
-            android:paddingStart="8dp" android:paddingEnd="8dp">
+    <!-- 10-band Equalizer panel -->
+    <HorizontalScrollView
+        android:id="@+id/layoutEq"
+        android:layout_width="match_parent"
+        android:layout_height="240dp"
+        android:background="#111111"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp">
+
             <LinearLayout android:layout_width="52dp" android:layout_height="match_parent" android:orientation="vertical" android:gravity="center">
                 <SeekBar android:id="@+id/seekBand0" android:layout_width="180dp" android:layout_height="36dp" android:rotation="270" android:progressTint="#00E676" android:thumbTint="#00E676"/>
                 <TextView android:id="@+id/tvBand0" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#00E676" android:textSize="9sp" android:fontFamily="monospace" android:layout_marginTop="16dp"/>
