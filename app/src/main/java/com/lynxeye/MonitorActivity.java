@@ -55,7 +55,8 @@ public class MonitorActivity extends AppCompatActivity {
     private Equalizer  equalizer;
     private volatile boolean running          = false;
     private volatile boolean isRecording      = false;
-    private volatile boolean cmdConnected     = false; // ← esperamos esto antes de audio/video
+    private volatile boolean switchCamPending = false;
+    private volatile boolean threadsStarted   = false; // ← evita doble arranque
 
     // Recording
     private FileOutputStream recordingStream;
@@ -97,9 +98,10 @@ public class MonitorActivity extends AppCompatActivity {
         layoutEq     = findViewById(R.id.layoutEq);
 
         tvDeviceName.setText(deviceName);
-        setStatus("CONNECTING...", 0xFFFFAA00);
+        tvStatus.setText("⬤  CONNECTING...");
+        tvStatus.setTextColor(0xFFFFAA00);
 
-        // TextureView → surface para decoder H264
+        // ✅ FIX: listener correcto, sin la línea que lo ponía a null
         textureView.setSurfaceTextureListener(new TextureView.SurfaceTextureListener() {
             @Override
             public void onSurfaceTextureAvailable(android.graphics.SurfaceTexture st, int w, int h) {
@@ -119,7 +121,8 @@ public class MonitorActivity extends AppCompatActivity {
         setupButtons();
 
         running = true;
-        startCommandConnection(); // audio y video arrancan DESDE AQUÍ cuando conecta
+        // ✅ FIX: audio y video arrancan SOLO cuando el comando conecta
+        startCommandConnection();
     }
 
     private void acquireWifiLock() {
@@ -130,14 +133,7 @@ public class MonitorActivity extends AppCompatActivity {
         } catch (Exception ignored) {}
     }
 
-    private void setStatus(String text, int color) {
-        runOnUiThread(() -> {
-            tvStatus.setText("⬤  " + text);
-            tvStatus.setTextColor(color);
-        });
-    }
-
-    // ─── Comando persistente ──────────────────────────────
+    // ─── Comando persistente + heartbeat ─────────────────
     private void startCommandConnection() {
         new Thread(() -> {
             while (running) {
@@ -149,19 +145,23 @@ public class MonitorActivity extends AppCompatActivity {
                     cmdSocket = s;
                     cmdWriter = new PrintWriter(s.getOutputStream(), true);
 
-                    // Primero enviamos los comandos, luego arrancamos audio/video
+                    // Enviar comandos directamente al writer (no en hilo aparte)
                     cmdWriter.println("START_AUDIO");
                     cmdWriter.println("START_CAMERA");
 
-                    if (!cmdConnected) {
-                        cmdConnected = true;
-                        setStatus("CONNECTED", 0xFF00E676);
+                    // ✅ Arrancar audio y video UNA sola vez después de conectar
+                    if (!threadsStarted) {
+                        threadsStarted = true;
                         startAudioThread();
                         startVideoThread();
                     }
 
-                    startPing();
+                    runOnUiThread(() -> {
+                        tvStatus.setText("⬤  CONNECTED");
+                        tvStatus.setTextColor(0xFF00E676);
+                    });
 
+                    startPing();
                     BufferedReader reader = new BufferedReader(new InputStreamReader(s.getInputStream()));
                     String line;
                     while (running && (line = reader.readLine()) != null) { /* PONG */ }
@@ -169,12 +169,14 @@ public class MonitorActivity extends AppCompatActivity {
                 } catch (Exception ignored) {
                 } finally {
                     stopPing();
-                    cmdConnected = false;
                     cmdWriter = null;
-                    try { if (cmdSocket != null) cmdSocket.close(); } catch (Exception ignored2) {}
+                    try { if (cmdSocket != null) cmdSocket.close(); } catch (Exception ignored) {}
                     cmdSocket = null;
                     if (running) {
-                        setStatus("RECONNECTING...", 0xFFFFAA00);
+                        runOnUiThread(() -> {
+                            tvStatus.setText("⬤  RECONNECTING...");
+                            tvStatus.setTextColor(0xFFFFAA00);
+                        });
                         try { Thread.sleep(4000); } catch (InterruptedException e) { break; }
                     }
                 }
@@ -264,7 +266,11 @@ public class MonitorActivity extends AppCompatActivity {
         btnRecord.setOnClickListener(v -> {
             if (isRecording) stopRecording(); else startRecording();
         });
-        btnSwitchCam.setOnClickListener(v -> sendCmd("SWITCH_CAM"));
+        btnSwitchCam.setOnClickListener(v -> {
+            switchCamPending = true;
+            sendCmd("SWITCH_CAM");
+            Toast.makeText(this, "Switching camera...", Toast.LENGTH_SHORT).show();
+        });
         btnEq.setOnClickListener(v ->
                 layoutEq.setVisibility(layoutEq.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE));
         btnFullscreen.setOnClickListener(v -> {
@@ -288,7 +294,10 @@ public class MonitorActivity extends AppCompatActivity {
                     socket.setSoTimeout(20000);
                     InputStream in = socket.getInputStream();
                     byte[] buffer = new byte[BUFFER_SIZE];
-                    setStatus("CONNECTED", 0xFF00E676);
+                    runOnUiThread(() -> {
+                        tvStatus.setText("⬤  CONNECTED");
+                        tvStatus.setTextColor(0xFF00E676);
+                    });
                     while (running && !socket.isClosed()) {
                         int read = in.read(buffer, 0, buffer.length);
                         if (read > 0) {
@@ -300,18 +309,21 @@ public class MonitorActivity extends AppCompatActivity {
                     }
                     socket.close();
                 } catch (Exception e) {
-                    setStatus("LOST SIGNAL", 0xFFFF3D3D);
-                    try { Thread.sleep(3000); } catch (InterruptedException ie) { break; }
+                    runOnUiThread(() -> {
+                        tvStatus.setText("⬤  LOST SIGNAL");
+                        tvStatus.setTextColor(0xFFFF3D3D);
+                    });
+                    try { Thread.sleep(2000); } catch (InterruptedException ie) { break; }
                 }
             }
         }, "AudioThread").start();
     }
 
-    // ─── Video Thread H264 ────────────────────────────────
+    // ─── Video Thread con H264 ────────────────────────────
     private void startVideoThread() {
         new Thread(() -> {
             while (running) {
-                // Esperar surface lista
+                // Esperar surface disponible
                 if (decoderSurface == null) {
                     try { Thread.sleep(200); } catch (InterruptedException e) { break; }
                     continue;
@@ -378,7 +390,7 @@ public class MonitorActivity extends AppCompatActivity {
                         videoDecoder = null;
                     }
                     if (socket != null) try { socket.close(); } catch (Exception ignored) {}
-                    if (running) try { Thread.sleep(3000); } catch (InterruptedException e) { break; }
+                    if (running) try { Thread.sleep(2000); } catch (InterruptedException e) { break; }
                 }
             }
         }, "VideoThread").start();
