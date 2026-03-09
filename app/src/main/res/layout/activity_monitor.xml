@@ -1,190 +1,197 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:orientation="vertical"
     android:background="#0A0A0A">
 
-    <!-- TextureView para H264 decode -->
-    <TextureView
-        android:id="@+id/textureView"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintBottom_toTopOf="@id/layoutControls"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"/>
-
-    <!-- Status -->
-    <TextView
-        android:id="@+id/tvStatus"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:textColor="#00E676"
-        android:textSize="12sp"
-        android:fontFamily="monospace"
-        android:padding="8dp"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintStart_toStartOf="parent"/>
-
-    <TextView
-        android:id="@+id/tvDeviceName"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:textColor="#00E676"
-        android:textSize="12sp"
-        android:fontFamily="monospace"
-        android:padding="8dp"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"/>
-
-    <TextView
-        android:id="@+id/tvRecTime"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:textColor="#FF3D3D"
-        android:textSize="12sp"
-        android:fontFamily="monospace"
-        android:visibility="gone"
-        app:layout_constraintTop_toBottomOf="@id/tvStatus"
-        app:layout_constraintStart_toStartOf="parent"
-        android:padding="8dp"/>
-
-    <!-- Controles -->
+    <!-- Header -->
     <LinearLayout
-        android:id="@+id/layoutControls"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:gravity="center"
-        android:background="#0D1A0D"
-        android:padding="8dp"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
+        android:padding="16dp"
+        android:gravity="center_vertical">
 
-        <ImageButton android:id="@+id/btnRecord"
-            android:layout_width="48dp" android:layout_height="48dp"
-            android:src="@android:drawable/ic_btn_speak_now"
-            android:background="?attr/selectableItemBackgroundBorderless"/>
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+            <TextView
+                android:id="@+id/tvDeviceName"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="16sp"
+                android:textColor="#FFFFFF"
+                android:textStyle="bold"
+                android:fontFamily="monospace"/>
+            <TextView
+                android:id="@+id/tvStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="⬤  CONNECTING..."
+                android:textSize="11sp"
+                android:textColor="#FFAA00"
+                android:fontFamily="monospace"/>
+        </LinearLayout>
 
-        <ImageButton android:id="@+id/btnScreenshot"
-            android:layout_width="48dp" android:layout_height="48dp"
-            android:src="@android:drawable/ic_menu_camera"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:layout_marginStart="8dp"/>
-
-        <ImageButton android:id="@+id/btnVideoToggle"
-            android:layout_width="48dp" android:layout_height="48dp"
-            android:src="@android:drawable/ic_menu_view"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:layout_marginStart="8dp"/>
-
-        <ImageButton android:id="@+id/btnAudioToggle"
-            android:layout_width="48dp" android:layout_height="48dp"
-            android:src="@android:drawable/ic_lock_silent_mode_off"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:layout_marginStart="8dp"/>
-
-        <ImageButton android:id="@+id/btnSwitchCam"
-            android:layout_width="48dp" android:layout_height="48dp"
-            android:src="@android:drawable/ic_menu_rotate"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:layout_marginStart="8dp"/>
-
-        <ImageButton android:id="@+id/btnNight"
-            android:layout_width="48dp" android:layout_height="48dp"
-            android:src="@android:drawable/ic_menu_month"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:layout_marginStart="8dp"/>
-
-        <Button android:id="@+id/btnEq"
-            android:layout_width="wrap_content" android:layout_height="40dp"
-            android:text="EQ"
-            android:textColor="#00E676"
-            android:backgroundTint="#0D1A0D"
-            android:layout_marginStart="8dp"/>
-    </LinearLayout>
-
-    <!-- Equalizer panel -->
-    <HorizontalScrollView
-        android:id="@+id/layoutEq"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:visibility="gone"
-        android:background="#0D1A0D"
-        app:layout_constraintBottom_toTopOf="@id/layoutControls"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
-
-        <LinearLayout
+        <TextView
+            android:id="@+id/tvRecTime"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:padding="8dp">
+            android:text="⏺ 00:00"
+            android:textSize="11sp"
+            android:textColor="#FF3D3D"
+            android:fontFamily="monospace"
+            android:visibility="gone"
+            android:layout_marginEnd="8dp"/>
+    </LinearLayout>
 
-            <!-- Band 0 -->
-            <LinearLayout android:layout_width="48dp" android:layout_height="wrap_content" android:orientation="vertical" android:gravity="center">
-                <TextView android:id="@+id/tvGain0" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#00E676" android:textSize="10sp" android:text="+0dB"/>
-                <SeekBar android:id="@+id/seekBand0" android:layout_width="48dp" android:layout_height="120dp" android:rotation="270"/>
-                <TextView android:id="@+id/tvBand0" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#00E676" android:textSize="9sp"/>
+    <!-- Video Feed -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="240dp"
+        android:background="#0D1A0D">
+
+        <TextureView
+            android:id="@+id/textureView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="LIVE FEED"
+            android:textSize="9sp"
+            android:textColor="#1A4D1A"
+            android:fontFamily="monospace"
+            android:padding="6dp"
+            android:layout_gravity="top|start"/>
+
+        <ImageButton
+            android:id="@+id/btnFullscreen"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:src="@android:drawable/ic_menu_zoom"
+            android:background="@android:color/transparent"
+            android:tint="#00E676"
+            android:layout_gravity="top|end"
+            android:padding="4dp"/>
+
+        <ImageButton
+            android:id="@+id/btnSwitchCam"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:src="@android:drawable/ic_menu_camera"
+            android:background="@android:color/transparent"
+            android:tint="#00E676"
+            android:layout_gravity="bottom|end"
+            android:padding="4dp"/>
+    </FrameLayout>
+
+    <!-- Scrollable controls -->
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:padding="16dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <!-- AUDIO CONTROL section -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="AUDIO CONTROL"
+                android:textSize="11sp"
+                android:textColor="#00E676"
+                android:fontFamily="monospace"
+                android:letterSpacing="0.2"
+                android:layout_marginBottom="12dp"/>
+
+            <!-- Volume -->
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginBottom="16dp">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="🔊" android:textSize="16sp" android:layout_marginEnd="8dp"/>
+                <SeekBar
+                    android:id="@+id/seekVolume"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:progressTint="#00E676"
+                    android:thumbTint="#00E676"/>
             </LinearLayout>
-            <!-- Band 1 -->
-            <LinearLayout android:layout_width="48dp" android:layout_height="wrap_content" android:orientation="vertical" android:gravity="center">
-                <TextView android:id="@+id/tvGain1" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#00E676" android:textSize="10sp" android:text="+0dB"/>
-                <SeekBar android:id="@+id/seekBand1" android:layout_width="48dp" android:layout_height="120dp" android:rotation="270"/>
-                <TextView android:id="@+id/tvBand1" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#00E676" android:textSize="9sp"/>
+
+            <!-- Action buttons -->
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginBottom="16dp">
+
+                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center" android:background="@drawable/card_dark" android:padding="16dp" android:layout_marginEnd="8dp">
+                    <ImageButton
+                        android:id="@+id/btnRecord"
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
+                        android:src="@android:drawable/ic_btn_speak_now"
+                        android:background="@android:color/transparent"
+                        android:tint="#FF3D3D"/>
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="REC" android:textSize="10sp" android:textColor="#FF3D3D" android:fontFamily="monospace" android:layout_marginTop="4dp"/>
+                </LinearLayout>
+
+                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center" android:background="@drawable/card_dark" android:padding="16dp">
+                    <ImageButton
+                        android:id="@+id/btnEq"
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
+                        android:src="@android:drawable/ic_menu_sort_by_size"
+                        android:background="@android:color/transparent"
+                        android:tint="#00E676"/>
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="EQ" android:textSize="10sp" android:textColor="#00E676" android:fontFamily="monospace" android:layout_marginTop="4dp"/>
+                </LinearLayout>
+
             </LinearLayout>
-            <!-- Band 2 -->
-            <LinearLayout android:layout_width="48dp" android:layout_height="wrap_content" android:orientation="vertical" android:gravity="center">
-                <TextView android:id="@+id/tvGain2" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#00E676" android:textSize="10sp" android:text="+0dB"/>
-                <SeekBar android:id="@+id/seekBand2" android:layout_width="48dp" android:layout_height="120dp" android:rotation="270"/>
-                <TextView android:id="@+id/tvBand2" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#00E676" android:textSize="9sp"/>
+
+            <!-- EQUALIZER panel -->
+            <LinearLayout
+                android:id="@+id/layoutEq"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="@drawable/card_dark"
+                android:padding="16dp"
+                android:visibility="gone"
+                android:layout_marginBottom="16dp">
+
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="EQUALIZER" android:textSize="11sp" android:textColor="#00E676" android:fontFamily="monospace" android:layout_marginBottom="12dp"/>
+
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
+
+                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center">
+                        <SeekBar android:id="@+id/seekBand0" android:layout_width="match_parent" android:layout_height="wrap_content" android:progressTint="#00E676" android:thumbTint="#00E676"/>
+                        <TextView android:id="@+id/tvBand0" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="60Hz" android:textSize="9sp" android:textColor="#555555" android:fontFamily="monospace"/>
+                    </LinearLayout>
+
+                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center">
+                        <SeekBar android:id="@+id/seekBand1" android:layout_width="match_parent" android:layout_height="wrap_content" android:progressTint="#00E676" android:thumbTint="#00E676"/>
+                        <TextView android:id="@+id/tvBand1" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="230Hz" android:textSize="9sp" android:textColor="#555555" android:fontFamily="monospace"/>
+                    </LinearLayout>
+
+                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center">
+                        <SeekBar android:id="@+id/seekBand2" android:layout_width="match_parent" android:layout_height="wrap_content" android:progressTint="#00E676" android:thumbTint="#00E676"/>
+                        <TextView android:id="@+id/tvBand2" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="910Hz" android:textSize="9sp" android:textColor="#555555" android:fontFamily="monospace"/>
+                    </LinearLayout>
+
+                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center">
+                        <SeekBar android:id="@+id/seekBand3" android:layout_width="match_parent" android:layout_height="wrap_content" android:progressTint="#00E676" android:thumbTint="#00E676"/>
+                        <TextView android:id="@+id/tvBand3" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="3.6kHz" android:textSize="9sp" android:textColor="#555555" android:fontFamily="monospace"/>
+                    </LinearLayout>
+
+                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center">
+                        <SeekBar android:id="@+id/seekBand4" android:layout_width="match_parent" android:layout_height="wrap_content" android:progressTint="#00E676" android:thumbTint="#00E676"/>
+                        <TextView android:id="@+id/tvBand4" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="14kHz" android:textSize="9sp" android:textColor="#555555" android:fontFamily="monospace"/>
+                    </LinearLayout>
+
+                </LinearLayout>
             </LinearLayout>
-            <!-- Band 3 -->
-            <LinearLayout android:layout_width="48dp" android:layout_height="wrap_content" android:orientation="vertical" android:gravity="center">
-                <TextView android:id="@+id/tvGain3" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#00E676" android:textSize="10sp" android:text="+0dB"/>
-                <SeekBar android:id="@+id/seekBand3" android:layout_width="48dp" android:layout_height="120dp" android:rotation="270"/>
-                <TextView android:id="@+id/tvBand3" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#00E676" android:textSize="9sp"/>
-            </LinearLayout>
-            <!-- Band 4 -->
-            <LinearLayout android:layout_width="48dp" android:layout_height="wrap_content" android:orientation="vertical" android:gravity="center">
-                <TextView android:id="@+id/tvGain4" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#00E676" android:textSize="10sp" android:text="+0dB"/>
-                <SeekBar android:id="@+id/seekBand4" android:layout_width="48dp" android:layout_height="120dp" android:rotation="270"/>
-                <TextView android:id="@+id/tvBand4" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#00E676" android:textSize="9sp"/>
-            </LinearLayout>
-            <!-- Band 5 -->
-            <LinearLayout android:layout_width="48dp" android:layout_height="wrap_content" android:orientation="vertical" android:gravity="center">
-                <TextView android:id="@+id/tvGain5" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#00E676" android:textSize="10sp" android:text="+0dB"/>
-                <SeekBar android:id="@+id/seekBand5" android:layout_width="48dp" android:layout_height="120dp" android:rotation="270"/>
-                <TextView android:id="@+id/tvBand5" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#00E676" android:textSize="9sp"/>
-            </LinearLayout>
-            <!-- Band 6 -->
-            <LinearLayout android:layout_width="48dp" android:layout_height="wrap_content" android:orientation="vertical" android:gravity="center">
-                <TextView android:id="@+id/tvGain6" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#00E676" android:textSize="10sp" android:text="+0dB"/>
-                <SeekBar android:id="@+id/seekBand6" android:layout_width="48dp" android:layout_height="120dp" android:rotation="270"/>
-                <TextView android:id="@+id/tvBand6" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#00E676" android:textSize="9sp"/>
-            </LinearLayout>
-            <!-- Band 7 -->
-            <LinearLayout android:layout_width="48dp" android:layout_height="wrap_content" android:orientation="vertical" android:gravity="center">
-                <TextView android:id="@+id/tvGain7" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#00E676" android:textSize="10sp" android:text="+0dB"/>
-                <SeekBar android:id="@+id/seekBand7" android:layout_width="48dp" android:layout_height="120dp" android:rotation="270"/>
-                <TextView android:id="@+id/tvBand7" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#00E676" android:textSize="9sp"/>
-            </LinearLayout>
-            <!-- Band 8 -->
-            <LinearLayout android:layout_width="48dp" android:layout_height="wrap_content" android:orientation="vertical" android:gravity="center">
-                <TextView android:id="@+id/tvGain8" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#00E676" android:textSize="10sp" android:text="+0dB"/>
-                <SeekBar android:id="@+id/seekBand8" android:layout_width="48dp" android:layout_height="120dp" android:rotation="270"/>
-                <TextView android:id="@+id/tvBand8" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#00E676" android:textSize="9sp"/>
-            </LinearLayout>
-            <!-- Band 9 -->
-            <LinearLayout android:layout_width="48dp" android:layout_height="wrap_content" android:orientation="vertical" android:gravity="center">
-                <TextView android:id="@+id/tvGain9" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#00E676" android:textSize="10sp" android:text="+0dB"/>
-                <SeekBar android:id="@+id/seekBand9" android:layout_width="48dp" android:layout_height="120dp" android:rotation="270"/>
-                <TextView android:id="@+id/tvBand9" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#00E676" android:textSize="9sp"/>
-            </LinearLayout>
+
         </LinearLayout>
-    </HorizontalScrollView>
+    </ScrollView>
 
-</androidx.constraintlayout.widget.ConstraintLayout>
+</LinearLayout>
