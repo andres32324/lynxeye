@@ -3,7 +3,6 @@ package com.lynxeye;
 import android.app.AlertDialog;
 import android.content.Intent;
 import android.os.Bundle;
-import android.os.Handler;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -13,37 +12,31 @@ import android.widget.ImageButton;
 import android.widget.ListView;
 import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
-import java.net.InetSocketAddress;
-import java.net.Socket;
 import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
 
 public class MainActivity extends AppCompatActivity {
 
     private List<DeviceStorage.Device> devices;
     private DeviceAdapter adapter;
-    private Handler pingHandler = new Handler();
-    private Runnable pingRunnable;
-    private ConcurrentHashMap<String, Boolean> statusMap = new ConcurrentHashMap<>();
-    private HackerVisualizerView hackerVisualizer;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        ServiceWatcher.schedule(this);
         setContentView(R.layout.activity_main);
 
-        ListView listView         = findViewById(R.id.listDevices);
-        ImageButton btnAdd        = findViewById(R.id.btnAdd);
-        ImageButton btnSettings   = findViewById(R.id.btnSettings);
-        ImageButton btnRecordings = findViewById(R.id.btnRecordings);
-        hackerVisualizer          = findViewById(R.id.hackerVisualizer);
+        ListView listView = findViewById(R.id.listDevices);
+        ImageButton btnAdd = findViewById(R.id.btnAdd);
+        ImageButton btnSettings = findViewById(R.id.btnSettings);
 
         devices = DeviceStorage.getDevices(this);
         adapter = new DeviceAdapter();
         listView.setAdapter(adapter);
 
-        listView.setOnItemClickListener((parent, view, position, id) ->
-                openMonitor(devices.get(position)));
+        listView.setOnItemClickListener((parent, view, position, id) -> {
+            DeviceStorage.Device device = devices.get(position);
+            openMonitor(device);
+        });
 
         listView.setOnItemLongClickListener((parent, view, position, id) -> {
             showDeleteDialog(position);
@@ -52,7 +45,6 @@ public class MainActivity extends AppCompatActivity {
 
         btnAdd.setOnClickListener(v -> showAddDialog());
         btnSettings.setOnClickListener(v -> startActivity(new Intent(this, SettingsActivity.class)));
-        btnRecordings.setOnClickListener(v -> startActivity(new Intent(this, RecordingsActivity.class)));
     }
 
     @Override
@@ -61,57 +53,6 @@ public class MainActivity extends AppCompatActivity {
         devices.clear();
         devices.addAll(DeviceStorage.getDevices(this));
         adapter.notifyDataSetChanged();
-        startPinging();
-
-        // Start/stop visualizer based on setting
-        if (AppSettings.isVisualizerEnabled(this)) {
-            hackerVisualizer.setVisibility(View.VISIBLE);
-            hackerVisualizer.start();
-        } else {
-            hackerVisualizer.stop();
-            hackerVisualizer.setVisibility(View.GONE);
-        }
-    }
-
-    @Override
-    protected void onPause() {
-        super.onPause();
-        stopPinging();
-        hackerVisualizer.stop();
-    }
-
-    private void startPinging() {
-        pingRunnable = new Runnable() {
-            @Override public void run() {
-                pingAllDevices();
-                pingHandler.postDelayed(this, 5000);
-            }
-        };
-        pingHandler.post(pingRunnable);
-    }
-
-    private void stopPinging() {
-        if (pingRunnable != null) pingHandler.removeCallbacks(pingRunnable);
-    }
-
-    private void pingAllDevices() {
-        for (DeviceStorage.Device device : devices) {
-            final String ip = device.ip;
-            new Thread(() -> {
-                boolean online = isOnline(ip);
-                statusMap.put(ip, online);
-                runOnUiThread(() -> adapter.notifyDataSetChanged());
-            }).start();
-        }
-    }
-
-    private boolean isOnline(String ip) {
-        try {
-            Socket s = new Socket();
-            s.connect(new InetSocketAddress(ip, 9999), 1500);
-            s.close();
-            return true;
-        } catch (Exception e) { return false; }
     }
 
     private void showAddDialog() {
@@ -128,6 +69,7 @@ public class MainActivity extends AppCompatActivity {
                 String ip   = etIp.getText().toString().trim();
                 String code = etCode.getText().toString().trim().toUpperCase();
                 if (!name.isEmpty() && !ip.isEmpty()) {
+                    if (name.isEmpty()) name = "Cat Monitor";
                     DeviceStorage.Device device = new DeviceStorage.Device(name, ip, code);
                     DeviceStorage.saveDevice(this, device);
                     openMonitor(device);
@@ -142,7 +84,7 @@ public class MainActivity extends AppCompatActivity {
             .setTitle("DELETE DEVICE")
             .setMessage("Remove " + devices.get(position).name + "?")
             .setPositiveButton("DELETE", (d, w) -> {
-                DeviceStorage.deleteDevice(this, devices.get(position).code, devices.get(position).ip);
+                DeviceStorage.deleteDevice(this, devices.get(position).code);
                 devices.remove(position);
                 adapter.notifyDataSetChanged();
             })
@@ -166,19 +108,10 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public View getView(int position, View convertView, ViewGroup parent) {
             if (convertView == null)
-                convertView = LayoutInflater.from(MainActivity.this)
-                        .inflate(R.layout.item_device, parent, false);
-
+                convertView = LayoutInflater.from(MainActivity.this).inflate(R.layout.item_device, parent, false);
             DeviceStorage.Device d = devices.get(position);
             ((TextView) convertView.findViewById(R.id.tvDeviceName)).setText(d.name);
             ((TextView) convertView.findViewById(R.id.tvDeviceIp)).setText(d.ip + "  #" + d.code);
-
-            TextView dot = convertView.findViewById(R.id.tvStatusDot);
-            Boolean online = statusMap.get(d.ip);
-            if (online == null) dot.setTextColor(0xFF444444);
-            else if (online)    dot.setTextColor(0xFF00E676);
-            else                dot.setTextColor(0xFFFF3D3D);
-
             return convertView;
         }
     }
