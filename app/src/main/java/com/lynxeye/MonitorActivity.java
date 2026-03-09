@@ -8,14 +8,17 @@ import android.content.Intent;
 import android.media.AudioAttributes;
 import android.media.AudioFormat;
 import android.media.AudioTrack;
+import android.media.MediaCodec;
+import android.media.MediaFormat;
 import android.media.audiofx.NoiseSuppressor;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.view.Surface;
+import android.view.TextureView;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.ImageButton;
-import android.widget.ImageView;
 import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -30,6 +33,7 @@ import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
@@ -43,7 +47,6 @@ public class MonitorActivity extends AppCompatActivity {
     private static final int PORT_VIDEO   = 9998;
     private static final int PORT_COMMAND = 9997;
     private static final int AUDIO_QUEUE_SIZE = 3;
-    private static final int VIDEO_QUEUE_SIZE  = 2;
     private static final String NOTIF_CHANNEL = "lynxeye_monitor";
     private static final int NOTIF_ID = 42;
 
@@ -53,10 +56,13 @@ public class MonitorActivity extends AppCompatActivity {
     private boolean videoEnabled;
 
     private TextView    tvStatus, tvDeviceName, tvRecTime;
-    private ImageView   ivVideo;
+    private TextureView textureView;
     private ImageButton btnRecord, btnSwitchCam, btnScreenshot, btnVideoToggle, btnAudioToggle;
-    private android.widget.Button btnEq;
+    private android.widget.Button btnEq, btnNight;
     private View        layoutEq;
+
+    private volatile Surface    decoderSurface = null;
+    private volatile MediaCodec videoDecoder   = null;
 
     private AudioTrack      audioTrack;
     private DspEqualizer    dspEq;
@@ -71,7 +77,6 @@ public class MonitorActivity extends AppCompatActivity {
     private android.graphics.Bitmap lastFrame = null;
 
     private final BlockingQueue<byte[]> audioQueue = new ArrayBlockingQueue<>(AUDIO_QUEUE_SIZE);
-    private final BlockingQueue<byte[]> videoQueue  = new ArrayBlockingQueue<>(VIDEO_QUEUE_SIZE);
 
     private File             currentRecordingFile;
     private FileOutputStream recordingStream;
@@ -92,20 +97,35 @@ public class MonitorActivity extends AppCompatActivity {
         audioMode    = AppSettings.getAudioMode(this);
         videoEnabled = AppSettings.isVideoEnabled(this);
 
-        tvStatus        = findViewById(R.id.tvStatus);
-        tvDeviceName    = findViewById(R.id.tvDeviceName);
-        tvRecTime       = findViewById(R.id.tvRecTime);
-        ivVideo         = findViewById(R.id.ivVideo);
-        btnRecord       = findViewById(R.id.btnRecord);
-        btnSwitchCam    = findViewById(R.id.btnSwitchCam);
-        btnScreenshot   = findViewById(R.id.btnScreenshot);
-        btnVideoToggle  = findViewById(R.id.btnVideoToggle);
-        btnAudioToggle  = findViewById(R.id.btnAudioToggle);
-        btnEq           = findViewById(R.id.btnEq);
-        layoutEq        = findViewById(R.id.layoutEq);
+        tvStatus       = findViewById(R.id.tvStatus);
+        tvDeviceName   = findViewById(R.id.tvDeviceName);
+        tvRecTime      = findViewById(R.id.tvRecTime);
+        textureView    = findViewById(R.id.textureView);
+        btnRecord      = findViewById(R.id.btnRecord);
+        btnSwitchCam   = findViewById(R.id.btnSwitchCam);
+        btnScreenshot  = findViewById(R.id.btnScreenshot);
+        btnVideoToggle = findViewById(R.id.btnVideoToggle);
+        btnAudioToggle = findViewById(R.id.btnAudioToggle);
+        btnEq          = findViewById(R.id.btnEq);
+        btnNight       = findViewById(R.id.btnNight);
+        layoutEq       = findViewById(R.id.layoutEq);
 
         tvDeviceName.setText(deviceName);
         setStatus("CONNECTING...", 0xFFFFAA00);
+
+        textureView.setSurfaceTextureListener(new TextureView.SurfaceTextureListener() {
+            @Override
+            public void onSurfaceTextureAvailable(android.graphics.SurfaceTexture st, int w, int h) {
+                decoderSurface = new Surface(st);
+            }
+            @Override public void onSurfaceTextureSizeChanged(android.graphics.SurfaceTexture st, int w, int h) {}
+            @Override public boolean onSurfaceTextureDestroyed(android.graphics.SurfaceTexture st) {
+                decoderSurface = null; return true;
+            }
+            @Override public void onSurfaceTextureUpdated(android.graphics.SurfaceTexture st) {
+                lastFrame = textureView.getBitmap();
+            }
+        });
 
         setupAudioTrack();
         setupNoiseSuppressor();
@@ -116,36 +136,25 @@ public class MonitorActivity extends AppCompatActivity {
         sendInitialSettings();
         startAudioReceiver();
         startAudioPlayer();
-        if (videoEnabled) {
-            startVideoReceiver();
-            startVideoRenderer();
-            ivVideo.setBackgroundColor(0xFF111111);
-        } else {
-            ivVideo.setBackgroundColor(0xFF0A1A0A);
-        }
+        if (videoEnabled) startVideoReceiver();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
         cancelNotification();
-        // Resume AudioTrack if it was paused
-        if (audioTrack != null && audioTrack.getPlayState() != android.media.AudioTrack.PLAYSTATE_PLAYING) {
+        if (audioTrack != null && audioTrack.getPlayState() != AudioTrack.PLAYSTATE_PLAYING)
             audioTrack.play();
-        }
     }
 
     @Override
     protected void onPause() {
         super.onPause();
-        // Keep audio running - just show notification
         if (running && audioEnabled) showBackgroundNotification();
-        // DO NOT pause audioTrack here
     }
 
     @Override
     public void onBackPressed() {
-        // Go back to MainActivity keeping audio alive
         Intent intent = new Intent(this, MainActivity.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         startActivity(intent);
@@ -157,32 +166,24 @@ public class MonitorActivity extends AppCompatActivity {
         intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
         PendingIntent pi = PendingIntent.getActivity(this, 0, intent,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-
         Intent stopIntent = new Intent(this, MonitorActivity.class);
         stopIntent.setAction("STOP_AUDIO");
         PendingIntent stopPi = PendingIntent.getActivity(this, 1, stopIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-
         Notification notif = new NotificationCompat.Builder(this, NOTIF_CHANNEL)
                 .setContentTitle("LynxEye — " + deviceName)
                 .setContentText("Audio activo en segundo plano")
                 .setSmallIcon(android.R.drawable.ic_btn_speak_now)
                 .setContentIntent(pi)
                 .addAction(android.R.drawable.ic_delete, "Detener", stopPi)
-                .setOngoing(true)
-                .build();
-
-        NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-        nm.notify(NOTIF_ID, notif);
+                .setOngoing(true).build();
+        ((NotificationManager) getSystemService(NOTIFICATION_SERVICE)).notify(NOTIF_ID, notif);
     }
 
     private void cancelNotification() {
-        NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-        nm.cancel(NOTIF_ID);
-        // Check if came back from stop action
+        ((NotificationManager) getSystemService(NOTIFICATION_SERVICE)).cancel(NOTIF_ID);
         if (getIntent() != null && "STOP_AUDIO".equals(getIntent().getAction())) {
-            stopAudio();
-            finish();
+            stopAudio(); finish();
         }
     }
 
@@ -216,41 +217,28 @@ public class MonitorActivity extends AppCompatActivity {
 
     private void updateStatus() {
         runOnUiThread(() -> {
-            if (audioConnected || videoConnected) {
-                tvStatus.setText("⬤  CONNECTED");
-                tvStatus.setTextColor(0xFF00E676);
-            } else {
-                tvStatus.setText("⬤  LOST SIGNAL");
-                tvStatus.setTextColor(0xFFFF3D3D);
-            }
+            if (audioConnected || videoConnected) setStatus("CONNECTED", 0xFF00E676);
+            else setStatus("LOST SIGNAL", 0xFFFF3D3D);
         });
     }
 
     private void setStatus(String text, int color) {
-        runOnUiThread(() -> {
-            tvStatus.setText("⬤  " + text);
-            tvStatus.setTextColor(color);
-        });
+        runOnUiThread(() -> { tvStatus.setText("⬤  " + text); tvStatus.setTextColor(color); });
     }
 
     private void setupAudioTrack() {
-        int channelMask = (audioMode == 1)
-                ? AudioFormat.CHANNEL_OUT_STEREO
-                : AudioFormat.CHANNEL_OUT_MONO;
+        int channelMask = (audioMode == 1) ? AudioFormat.CHANNEL_OUT_STEREO : AudioFormat.CHANNEL_OUT_MONO;
         int minBuf = AudioTrack.getMinBufferSize(sampleRate, channelMask, AudioFormat.ENCODING_PCM_16BIT);
         audioTrack = new AudioTrack.Builder()
                 .setAudioAttributes(new AudioAttributes.Builder()
                         .setUsage(AudioAttributes.USAGE_MEDIA)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                        .build())
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())
                 .setAudioFormat(new AudioFormat.Builder()
                         .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
                         .setSampleRate(sampleRate)
-                        .setChannelMask(channelMask)
-                        .build())
+                        .setChannelMask(channelMask).build())
                 .setBufferSizeInBytes(minBuf * 2)
-                .setTransferMode(AudioTrack.MODE_STREAM)
-                .build();
+                .setTransferMode(AudioTrack.MODE_STREAM).build();
         audioTrack.play();
     }
 
@@ -319,7 +307,12 @@ public class MonitorActivity extends AppCompatActivity {
     private void startVideoReceiver() {
         new Thread(() -> {
             while (running) {
+                if (decoderSurface == null) {
+                    try { Thread.sleep(200); } catch (InterruptedException e) { break; }
+                    continue;
+                }
                 Socket socket = null;
+                MediaCodec decoder = null;
                 try {
                     socket = new Socket();
                     socket.connect(new InetSocketAddress(deviceIp, PORT_VIDEO), 5000);
@@ -327,45 +320,60 @@ public class MonitorActivity extends AppCompatActivity {
                     socket.setSoTimeout(10000);
                     socket.setKeepAlive(true);
                     DataInputStream in = new DataInputStream(socket.getInputStream());
+                    decoder = MediaCodec.createDecoderByType("video/avc");
+                    videoDecoder = decoder;
+                    boolean configured = false;
                     videoConnected = true;
                     updateStatus();
                     while (running && !socket.isClosed()) {
                         int len = in.readInt();
-                        if (len <= 0 || len > 3_000_000) continue;
-                        byte[] frame = new byte[len];
+                        if (len <= 0 || len > 10_000_000) continue;
+                        byte flags = in.readByte();
+                        byte[] data = new byte[len];
                         int total = 0;
-                        while (total < len) { int r = in.read(frame, total, len - total); if (r < 0) break; total += r; }
-                        if (!videoQueue.offer(frame)) { videoQueue.poll(); videoQueue.offer(frame); }
+                        while (total < len) {
+                            int r = in.read(data, total, len - total);
+                            if (r < 0) break;
+                            total += r;
+                        }
+                        boolean isConfig = (flags & 1) != 0;
+                        if (isConfig && !configured && decoderSurface != null) {
+                            MediaFormat format = MediaFormat.createVideoFormat("video/avc", 1280, 720);
+                            format.setByteBuffer("csd-0", ByteBuffer.wrap(data));
+                            decoder.configure(format, decoderSurface, null, 0);
+                            decoder.start();
+                            configured = true;
+                            continue;
+                        }
+                        if (!configured) continue;
+                        int inIndex = decoder.dequeueInputBuffer(10_000);
+                        if (inIndex >= 0) {
+                            ByteBuffer inBuf = decoder.getInputBuffer(inIndex);
+                            if (inBuf != null) {
+                                inBuf.clear();
+                                inBuf.put(data);
+                                decoder.queueInputBuffer(inIndex, 0, data.length,
+                                        System.currentTimeMillis() * 1000, 0);
+                            }
+                        }
+                        MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
+                        int outIndex = decoder.dequeueOutputBuffer(info, 0);
+                        if (outIndex >= 0) decoder.releaseOutputBuffer(outIndex, true);
                     }
-                } catch (Exception e) {
+                } catch (Exception ignored) {
                 } finally {
                     videoConnected = false;
                     updateStatus();
-                    videoQueue.clear();
+                    if (decoder != null) {
+                        try { decoder.stop(); } catch (Exception ignored) {}
+                        try { decoder.release(); } catch (Exception ignored) {}
+                        videoDecoder = null;
+                    }
                     if (socket != null) try { socket.close(); } catch (Exception ignored) {}
-                    if (running) try { Thread.sleep(2000); } catch (InterruptedException ie) { break; }
+                    if (running) try { Thread.sleep(2000); } catch (InterruptedException e) { break; }
                 }
             }
         }, "VideoReceiver").start();
-    }
-
-    private void startVideoRenderer() {
-        new Thread(() -> {
-            while (running) {
-                try {
-                    byte[] frame = videoQueue.poll(500, TimeUnit.MILLISECONDS);
-                    if (frame != null) {
-                        android.graphics.BitmapFactory.Options opts = new android.graphics.BitmapFactory.Options();
-                        opts.inPreferredConfig = android.graphics.Bitmap.Config.RGB_565;
-                        android.graphics.Bitmap bmp = android.graphics.BitmapFactory.decodeByteArray(frame, 0, frame.length, opts);
-                        if (bmp != null) { lastFrame = bmp; runOnUiThread(() -> ivVideo.setImageBitmap(bmp)); }
-                    } else if (lastFrame != null) {
-                        final android.graphics.Bitmap keep = lastFrame;
-                        runOnUiThread(() -> ivVideo.setImageBitmap(keep));
-                    }
-                } catch (InterruptedException e) { break; }
-            }
-        }, "VideoRenderer").start();
     }
 
     private void setupEqualizer() {
@@ -379,8 +387,7 @@ public class MonitorActivity extends AppCompatActivity {
         for (int i = 0; i < DspEqualizer.BANDS; i++) {
             ((TextView) findViewById(labelIds[i])).setText(DspEqualizer.LABELS[i]);
             SeekBar sb = findViewById(seekIds[i]);
-            sb.setMax(240);
-            sb.setProgress(120);
+            sb.setMax(240); sb.setProgress(120);
             final int band = i;
             final TextView tvGain = findViewById(gainIds[i]);
             sb.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
@@ -397,49 +404,41 @@ public class MonitorActivity extends AppCompatActivity {
 
     private void setupButtons() {
         btnRecord.setOnClickListener(v -> { if (isRecording) stopRecording(); else startRecording(); });
-
         btnSwitchCam.setOnClickListener(v -> sendCommand("SWITCH_CAM"));
-
         btnVideoToggle.setOnClickListener(v -> {
-            boolean current = AppSettings.isVideoEnabled(this);
-            boolean newVal  = !current;
+            boolean newVal = !AppSettings.isVideoEnabled(this);
             AppSettings.setVideoEnabled(this, newVal);
+            videoEnabled = newVal;
             sendCommand(newVal ? "VIDEO_ON" : "VIDEO_OFF");
+            sendCommand(newVal ? "START_CAMERA" : "STOP_CAMERA");
             btnVideoToggle.setColorFilter(newVal ? 0xFF00E676 : 0xFFFF3D3D);
-            if (!newVal) {
-                videoQueue.clear(); lastFrame = null;
-                ivVideo.setImageBitmap(null);
-                ivVideo.setBackgroundColor(0xFF0A1A0A);
-            } else {
-                ivVideo.setBackgroundColor(0xFF111111);
-                startVideoReceiver();
-                startVideoRenderer();
-            }
+            if (newVal && !videoConnected) startVideoReceiver();
         });
         btnVideoToggle.setColorFilter(videoEnabled ? 0xFF00E676 : 0xFFFF3D3D);
-
-        // Audio toggle button
         btnAudioToggle.setOnClickListener(v -> {
             audioEnabled = !audioEnabled;
             btnAudioToggle.setColorFilter(audioEnabled ? 0xFF00E676 : 0xFFFF3D3D);
             if (!audioEnabled) audioQueue.clear();
         });
         btnAudioToggle.setColorFilter(0xFF00E676);
-
         btnScreenshot.setOnClickListener(v -> takeScreenshot());
-
+        btnNight.setOnClickListener(v -> {
+            boolean night = btnNight.getText().toString().equals("🌙");
+            if (night) {
+                android.graphics.ColorMatrix cm = new android.graphics.ColorMatrix(new float[]{
+                    1.4f,0,0,0,80f, 0,1.4f,0,0,80f, 0,0,1.4f,0,80f, 0,0,0,1,0});
+                textureView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+                android.graphics.Paint paint = new android.graphics.Paint();
+                paint.setColorFilter(new android.graphics.ColorMatrixColorFilter(cm));
+                textureView.setLayerPaint(paint);
+                btnNight.setText("☀️");
+            } else {
+                textureView.setLayerPaint(null);
+                btnNight.setText("🌙");
+            }
+        });
         btnEq.setOnClickListener(v ->
                 layoutEq.setVisibility(layoutEq.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE));
-    }
-
-    private void stopAudio() {
-        running = false;
-        audioQueue.clear();
-        videoQueue.clear();
-        if (isRecording) stopRecording();
-        if (noiseSuppressor != null) { noiseSuppressor.setEnabled(false); noiseSuppressor.release(); }
-        if (audioTrack != null) { audioTrack.stop(); audioTrack.release(); }
-        cancelNotification();
     }
 
     private void sendCommand(String cmd) {
@@ -457,31 +456,29 @@ public class MonitorActivity extends AppCompatActivity {
     }
 
     private void takeScreenshot() {
-        if (lastFrame == null) { Toast.makeText(this, "No hay video activo", Toast.LENGTH_SHORT).show(); return; }
+        android.graphics.Bitmap bmp = lastFrame;
+        if (bmp == null) { Toast.makeText(this, "No hay video activo", Toast.LENGTH_SHORT).show(); return; }
         try {
             File dir = new File(getExternalFilesDir(null), "Screenshots");
             if (!dir.exists()) dir.mkdirs();
-            String filename = "LynxEye_" + new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.getDefault()).format(new Date()) + ".jpg";
-            File file = new File(dir, filename);
-            FileOutputStream fos = new FileOutputStream(file);
-            lastFrame.compress(android.graphics.Bitmap.CompressFormat.JPEG, 95, fos);
+            String fn = "LynxEye_" + new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss",
+                    Locale.getDefault()).format(new Date()) + ".jpg";
+            FileOutputStream fos = new FileOutputStream(new File(dir, fn));
+            bmp.compress(android.graphics.Bitmap.CompressFormat.JPEG, 95, fos);
             fos.flush(); fos.close();
-            Toast.makeText(this, "📸 " + filename, Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "📸 " + fn, Toast.LENGTH_LONG).show();
         } catch (Exception e) {
             Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_LONG).show();
         }
     }
 
-    private File getRecordingsDir() {
-        File dir = new File(getExternalFilesDir(null), "Recordings");
-        if (!dir.exists()) dir.mkdirs();
-        return dir;
-    }
-
     private void startRecording() {
         try {
-            String filename = "LynxEye_" + new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.getDefault()).format(new Date()) + ".wav";
-            currentRecordingFile = new File(getRecordingsDir(), filename);
+            File dir = new File(getExternalFilesDir(null), "Recordings");
+            if (!dir.exists()) dir.mkdirs();
+            String fn = "LynxEye_" + new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss",
+                    Locale.getDefault()).format(new Date()) + ".wav";
+            currentRecordingFile = new File(dir, fn);
             recordingStream = new FileOutputStream(currentRecordingFile);
             int channels = (audioMode == 1) ? 2 : 1;
             writeWavHeader(recordingStream, 0, sampleRate, channels);
@@ -547,10 +544,18 @@ public class MonitorActivity extends AppCompatActivity {
         raf.close();
     }
 
+    private void stopAudio() {
+        running = false;
+        audioQueue.clear();
+        if (isRecording) stopRecording();
+        if (noiseSuppressor != null) { noiseSuppressor.setEnabled(false); noiseSuppressor.release(); }
+        if (audioTrack != null) { audioTrack.stop(); audioTrack.release(); }
+        cancelNotification();
+    }
+
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        cancelNotification();
         stopAudio();
     }
 }
