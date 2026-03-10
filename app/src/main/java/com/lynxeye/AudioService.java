@@ -69,6 +69,7 @@ public class AudioService extends Service {
 
     public interface Callback {
         void onAudioConnected(boolean connected);
+        void onAudioLevel(float level);
     }
     private Callback callback;
 
@@ -265,6 +266,7 @@ public class AudioService extends Service {
                     if (chunk != null) {
                         if (dspEq != null) chunk = dspEq.process(chunk);
                         if (audioEnabled) audioTrack.write(chunk, 0, chunk.length);
+                        notifyLevel(chunk);
                         if (isRecording && recordingStream != null) {
                             try { recordingStream.write(chunk); totalAudioBytes += chunk.length; }
                             catch (Exception ignored) {}
@@ -273,6 +275,19 @@ public class AudioService extends Service {
                 } catch (InterruptedException e) { break; }
             }
         }, "AudioPlayer").start();
+    }
+
+    private void notifyLevel(byte[] chunk) {
+        if (callback == null) return;
+        long sum = 0;
+        for (int i = 0; i < chunk.length - 1; i += 2) {
+            short s = (short) ((chunk[i + 1] << 8) | (chunk[i] & 0xFF));
+            sum += (long) s * s;
+        }
+        float rms = (float) Math.sqrt(sum / (chunk.length / 2.0));
+        float level = Math.min(1.0f, rms / 32768f);
+        android.os.Handler h = new android.os.Handler(android.os.Looper.getMainLooper());
+        h.post(() -> { if (callback != null) callback.onAudioLevel(level); });
     }
 
     private void stopAudio() {

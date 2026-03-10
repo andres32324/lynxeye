@@ -74,6 +74,12 @@ public class HackerVisualizerView extends View {
         }
     }
 
+    private float audioLevel = 0f;
+
+    public void updateLevel(float level) {
+        audioLevel = level;
+    }
+
     public void start() {
         if (!running) {
             running = true;
@@ -88,11 +94,12 @@ public class HackerVisualizerView extends View {
 
     private void update() {
         // Animate bars toward targets
+        float base = audioLevel > 0.01f ? audioLevel : 0f;
         for (int i = 0; i < BAR_COUNT; i++) {
             barHeights[i] += (barTargets[i] - barHeights[i]) * 0.15f;
-            // Occasionally set new target
             if (rng.nextFloat() < 0.08f) {
-                barTargets[i] = rng.nextFloat() * 0.85f + 0.05f;
+                float t = base > 0.01f ? base * (0.4f + rng.nextFloat() * 0.8f) : rng.nextFloat() * 0.15f + 0.02f;
+                barTargets[i] = Math.min(1f, t);
             }
         }
 
@@ -100,7 +107,8 @@ public class HackerVisualizerView extends View {
         for (int i = 0; i < wavePoints.length - 1; i++) {
             wavePoints[i] = wavePoints[i + 1];
         }
-        wavePoints[wavePoints.length - 1] = (rng.nextFloat() - 0.5f) * 0.6f;
+        float wAmp = audioLevel > 0.01f ? audioLevel * 1.2f : 0.05f;
+        wavePoints[wavePoints.length - 1] = (rng.nextFloat() - 0.5f) * wAmp * 2f;
     }
 
     @Override
