@@ -96,9 +96,9 @@ public class HackerVisualizerView extends View {
         // Animate bars toward targets
         float base = audioLevel > 0.01f ? audioLevel : 0f;
         for (int i = 0; i < BAR_COUNT; i++) {
-            barHeights[i] += (barTargets[i] - barHeights[i]) * 0.15f;
-            if (rng.nextFloat() < 0.08f) {
-                float t = base > 0.01f ? base * (0.4f + rng.nextFloat() * 0.8f) : rng.nextFloat() * 0.15f + 0.02f;
+            barHeights[i] += (barTargets[i] - barHeights[i]) * 0.25f;
+            if (base > 0.01f || rng.nextFloat() < 0.08f) {
+                float t = base > 0.01f ? base * (0.5f + rng.nextFloat() * 0.7f) : rng.nextFloat() * 0.15f + 0.02f;
                 barTargets[i] = Math.min(1f, t);
             }
         }
