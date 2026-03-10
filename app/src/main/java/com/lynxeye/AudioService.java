@@ -113,19 +113,20 @@ public class AudioService extends Service {
         showNotification("Conectando...");
     }
 
+
     private void sendStartCommands() {
         new Thread(() -> {
             try {
                 Thread.sleep(500);
                 Socket s = new Socket();
                 s.connect(new InetSocketAddress(deviceIp, PORT_COMMAND), 2000);
-                String cmds = (audioMode == 1 ? "AUDIO_STEREO
-" : "AUDIO_MONO
-") + "SR_" + sampleRate + "
-" + (AppSettings.isVideoEnabled(this) ? "VIDEO_ON
-" : "VIDEO_OFF
-") + "START_AUDIO\n" + (AppSettings.isVideoEnabled(this) ? "START_CAMERA\n" : "");
-                s.getOutputStream().write(cmds.getBytes());
+                StringBuilder sb = new StringBuilder();
+                sb.append(audioMode == 1 ? "AUDIO_STEREO\n" : "AUDIO_MONO\n");
+                sb.append("SR_").append(sampleRate).append("\n");
+                sb.append(AppSettings.isVideoEnabled(this) ? "VIDEO_ON\n" : "VIDEO_OFF\n");
+                sb.append("START_AUDIO\n");
+                if (AppSettings.isVideoEnabled(this)) sb.append("START_CAMERA\n");
+                s.getOutputStream().write(sb.toString().getBytes());
                 s.getOutputStream().flush();
                 s.close();
             } catch (Exception ignored) {}
