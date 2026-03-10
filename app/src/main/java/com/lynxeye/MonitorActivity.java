@@ -330,7 +330,7 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
                 MediaCodec decoder = null;
                 try {
                     socket = new Socket();
-                    Thread.sleep(1500);
+                    Thread.sleep(3000);
                 socket.connect(new InetSocketAddress(deviceIp, PORT_VIDEO), 5000);
                     socket.setTcpNoDelay(true);
                     socket.setSoTimeout(VIDEO_TIMEOUT_MS);
