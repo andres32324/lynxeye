@@ -264,6 +264,9 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
 
     // ─── AudioService.Callback ────────────────────────────
     @Override
+    public void onAudioLevel(float level) {}
+
+    @Override
     public void onAudioConnected(boolean connected) {
         runOnUiThread(() -> {
             if (connected || videoConnected) {
