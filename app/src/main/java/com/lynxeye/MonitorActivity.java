@@ -509,6 +509,7 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
             AppSettings.setVideoEnabled(this, nw);
             videoEnabled = nw;
             sendCommand(nw ? "VIDEO_ON" : "VIDEO_OFF");
+            sendCommand(nw ? "START_CAMERA" : "STOP_CAMERA");
             btnVideoToggle.setColorFilter(nw ? 0xFF00E676 : 0xFFFF3D3D);
             if (!nw) {
                 videoQueue.clear(); lastFrame = null;
