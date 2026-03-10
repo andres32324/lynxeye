@@ -1,178 +1,218 @@
 package com.lynxeye;
 
 import android.content.Context;
+import android.graphics.BlurMaskFilter;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Path;
+import android.graphics.Typeface;
 import android.util.AttributeSet;
 import android.view.View;
-
 import java.util.Random;
 
+/* JADX INFO: loaded from: classes3.dex */
 public class HackerVisualizerView extends View {
+    private final int BAR_COUNT;
+    private final Runnable animator;
+    private final Paint barGlow;
+    private final float[] barHeights;
+    private final Paint barPaint;
+    private final float[] barTargets;
+    private final Paint glowPaint;
+    private final Paint gridPaint;
+    private final Random rng;
+    private boolean running;
+    private final Paint wavePaint;
+    private final Path wavePath;
+    private final float[] wavePoints;
 
-    private final Paint wavePaint  = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint glowPaint  = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint barPaint   = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint barGlow    = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint gridPaint  = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Path  wavePath   = new Path();
+    public HackerVisualizerView(Context ctx) {
+        super(ctx);
+        this.wavePaint = new Paint(1);
+        this.glowPaint = new Paint(1);
+        this.barPaint = new Paint(1);
+        this.barGlow = new Paint(1);
+        this.gridPaint = new Paint(1);
+        this.wavePath = new Path();
+        this.rng = new Random();
+        this.BAR_COUNT = 24;
+        this.barHeights = new float[24];
+        this.barTargets = new float[24];
+        this.wavePoints = new float[128];
+        this.running = false;
+        this.animator = new Runnable() { // from class: com.lynxeye.HackerVisualizerView.1
+            @Override // java.lang.Runnable
+            public void run() {
+                HackerVisualizerView.this.update();
+                HackerVisualizerView.this.invalidate();
+                if (HackerVisualizerView.this.running) {
+                    HackerVisualizerView.this.postDelayed(this, 40L);
+                }
+            }
+        };
+        init();
+    }
 
-    private final Random rng = new Random();
-    private final int BAR_COUNT = 24;
-    private final float[] barHeights    = new float[BAR_COUNT];
-    private final float[] barTargets    = new float[BAR_COUNT];
-    private final float[] wavePoints    = new float[128];
-
-    private boolean running = false;
-    private final Runnable animator = new Runnable() {
-        @Override public void run() {
-            update();
-            invalidate();
-            if (running) postDelayed(this, 40); // ~25fps
-        }
-    };
-
-    public HackerVisualizerView(Context ctx) { super(ctx); init(); }
-    public HackerVisualizerView(Context ctx, AttributeSet a) { super(ctx, a); init(); }
+    public HackerVisualizerView(Context ctx, AttributeSet a) {
+        super(ctx, a);
+        this.wavePaint = new Paint(1);
+        this.glowPaint = new Paint(1);
+        this.barPaint = new Paint(1);
+        this.barGlow = new Paint(1);
+        this.gridPaint = new Paint(1);
+        this.wavePath = new Path();
+        this.rng = new Random();
+        this.BAR_COUNT = 24;
+        this.barHeights = new float[24];
+        this.barTargets = new float[24];
+        this.wavePoints = new float[128];
+        this.running = false;
+        this.animator = new Runnable() { // from class: com.lynxeye.HackerVisualizerView.1
+            @Override // java.lang.Runnable
+            public void run() {
+                HackerVisualizerView.this.update();
+                HackerVisualizerView.this.invalidate();
+                if (HackerVisualizerView.this.running) {
+                    HackerVisualizerView.this.postDelayed(this, 40L);
+                }
+            }
+        };
+        init();
+    }
 
     private void init() {
-        // Wave
-        wavePaint.setColor(0xFF00E676);
-        wavePaint.setStrokeWidth(1.5f);
-        wavePaint.setStyle(Paint.Style.STROKE);
-
-        glowPaint.setColor(0x3300E676);
-        glowPaint.setStrokeWidth(5f);
-        glowPaint.setStyle(Paint.Style.STROKE);
-        glowPaint.setMaskFilter(new android.graphics.BlurMaskFilter(
-                6f, android.graphics.BlurMaskFilter.Blur.NORMAL));
-
-        // Bars
-        barPaint.setColor(0xFF00E676);
-        barPaint.setStyle(Paint.Style.FILL);
-
-        barGlow.setColor(0x5500E676);
-        barGlow.setStyle(Paint.Style.FILL);
-        barGlow.setMaskFilter(new android.graphics.BlurMaskFilter(
-                8f, android.graphics.BlurMaskFilter.Blur.NORMAL));
-
-        // Grid
-        gridPaint.setColor(0x15005500);
-        gridPaint.setStrokeWidth(1f);
-        gridPaint.setStyle(Paint.Style.STROKE);
-
-        // Init bar targets
-        for (int i = 0; i < BAR_COUNT; i++) {
-            barTargets[i] = rng.nextFloat() * 0.7f + 0.05f;
-            barHeights[i] = barTargets[i];
+        this.wavePaint.setColor(-16718218);
+        this.wavePaint.setStrokeWidth(1.5f);
+        this.wavePaint.setStyle(Paint.Style.STROKE);
+        this.glowPaint.setColor(855697014);
+        this.glowPaint.setStrokeWidth(5.0f);
+        this.glowPaint.setStyle(Paint.Style.STROKE);
+        this.glowPaint.setMaskFilter(new BlurMaskFilter(6.0f, BlurMaskFilter.Blur.NORMAL));
+        this.barPaint.setColor(-16718218);
+        this.barPaint.setStyle(Paint.Style.FILL);
+        this.barGlow.setColor(1426122358);
+        this.barGlow.setStyle(Paint.Style.FILL);
+        this.barGlow.setMaskFilter(new BlurMaskFilter(8.0f, BlurMaskFilter.Blur.NORMAL));
+        this.gridPaint.setColor(352343296);
+        this.gridPaint.setStrokeWidth(1.0f);
+        this.gridPaint.setStyle(Paint.Style.STROKE);
+        for (int i = 0; i < 24; i++) {
+            this.barTargets[i] = (this.rng.nextFloat() * 0.7f) + 0.05f;
+            this.barHeights[i] = this.barTargets[i];
         }
-
-        // Init wave
-        for (int i = 0; i < wavePoints.length; i++) {
-            wavePoints[i] = (rng.nextFloat() - 0.5f) * 0.4f;
+        int i2 = 0;
+        while (true) {
+            float[] fArr = this.wavePoints;
+            if (i2 < fArr.length) {
+                fArr[i2] = (this.rng.nextFloat() - 0.5f) * 0.4f;
+                i2++;
+            } else {
+                return;
+            }
         }
     }
 
     public void start() {
-        if (!running) {
-            running = true;
-            post(animator);
+        if (!this.running) {
+            this.running = true;
+            post(this.animator);
         }
     }
 
     public void stop() {
-        running = false;
-        removeCallbacks(animator);
+        this.running = false;
+        removeCallbacks(this.animator);
     }
 
-    private void update() {
-        // Animate bars toward targets
-        for (int i = 0; i < BAR_COUNT; i++) {
-            barHeights[i] += (barTargets[i] - barHeights[i]) * 0.15f;
-            // Occasionally set new target
-            if (rng.nextFloat() < 0.08f) {
-                barTargets[i] = rng.nextFloat() * 0.85f + 0.05f;
+    /* JADX INFO: Access modifiers changed from: private */
+    public void update() {
+        for (int i = 0; i < 24; i++) {
+            float[] fArr = this.barHeights;
+            float f = fArr[i];
+            fArr[i] = f + ((this.barTargets[i] - f) * 0.15f);
+            if (this.rng.nextFloat() < 0.08f) {
+                this.barTargets[i] = (this.rng.nextFloat() * 0.85f) + 0.05f;
             }
         }
-
-        // Animate wave
-        for (int i = 0; i < wavePoints.length - 1; i++) {
-            wavePoints[i] = wavePoints[i + 1];
+        int i2 = 0;
+        while (true) {
+            float[] fArr2 = this.wavePoints;
+            if (i2 < fArr2.length - 1) {
+                fArr2[i2] = fArr2[i2 + 1];
+                i2++;
+            } else {
+                int i3 = fArr2.length;
+                fArr2[i3 - 1] = (this.rng.nextFloat() - 0.5f) * 0.6f;
+                return;
+            }
         }
-        wavePoints[wavePoints.length - 1] = (rng.nextFloat() - 0.5f) * 0.6f;
     }
 
-    @Override
+    @Override // android.view.View
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
         int w = getWidth();
         int h = getHeight();
-        if (w == 0 || h == 0) return;
-
-        canvas.drawColor(0xFF0A0A0A);
-
-        // Draw grid lines
-        int gridRows = 4;
-        for (int i = 1; i < gridRows; i++) {
-            float y = h * i / (float) gridRows;
-            canvas.drawLine(0, y, w, y, gridPaint);
+        if (w == 0 || h == 0) {
+            return;
         }
-
-        // Split: left half = wave, right half = bars
+        canvas.drawColor(-16119286);
+        for (int i = 1; i < 4; i++) {
+            float y = (h * i) / 4;
+            canvas.drawLine(0.0f, y, w, y, this.gridPaint);
+        }
         float mid = w * 0.5f;
         float waveH = h * 0.45f;
-
-        // ── Wave (left side) ──────────────────────────
         float waveCY = h * 0.28f;
-        wavePath.reset();
-        float wStep = mid / (wavePoints.length - 1);
-        for (int i = 0; i < wavePoints.length; i++) {
-            float x = i * wStep;
-            float y = waveCY + wavePoints[i] * waveH;
-            if (i == 0) wavePath.moveTo(x, y);
-            else wavePath.lineTo(x, y);
+        this.wavePath.reset();
+        float wStep = mid / (this.wavePoints.length - 1);
+        int i2 = 0;
+        while (true) {
+            float[] fArr = this.wavePoints;
+            if (i2 >= fArr.length) {
+                break;
+            }
+            float x = i2 * wStep;
+            float y2 = (fArr[i2] * waveH) + waveCY;
+            if (i2 == 0) {
+                this.wavePath.moveTo(x, y2);
+            } else {
+                this.wavePath.lineTo(x, y2);
+            }
+            i2++;
         }
-        canvas.drawPath(wavePath, glowPaint);
-        canvas.drawPath(wavePath, wavePaint);
-
-        // Label
-        Paint labelPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        labelPaint.setColor(0x6600E676);
-        labelPaint.setTextSize(18f);
-        labelPaint.setTypeface(android.graphics.Typeface.MONOSPACE);
-        canvas.drawText("AUDIO", 8f, h - 8f, labelPaint);
-
-        // ── Bars (right side) ─────────────────────────
-        float barAreaW = w - mid - 8f;
-        float barW = (barAreaW / BAR_COUNT) * 0.7f;
-        float gap   = (barAreaW / BAR_COUNT) * 0.3f;
-        float barBottom = h - 12f;
-
-        for (int i = 0; i < BAR_COUNT; i++) {
-            float x = mid + 4f + i * (barW + gap);
-            float bh = barHeights[i] * (h - 20f);
+        canvas.drawPath(this.wavePath, this.glowPaint);
+        canvas.drawPath(this.wavePath, this.wavePaint);
+        Paint labelPaint = new Paint(1);
+        labelPaint.setColor(1711335030);
+        labelPaint.setTextSize(18.0f);
+        labelPaint.setTypeface(Typeface.MONOSPACE);
+        float f = 8.0f;
+        canvas.drawText("AUDIO", 8.0f, h - 8.0f, labelPaint);
+        float barAreaW = (w - mid) - 8.0f;
+        float barW = (barAreaW / 24.0f) * 0.7f;
+        float gap = (barAreaW / 24.0f) * 0.3f;
+        float barBottom = h - 12.0f;
+        int i3 = 0;
+        while (i3 < 24) {
+            float x2 = 4.0f + mid + (i3 * (barW + gap));
+            float bh = this.barHeights[i3] * (h - 20.0f);
             float top = barBottom - bh;
-
-            // Glow
-            canvas.drawRect(x - 2, top - 2, x + barW + 2, barBottom + 2, barGlow);
-            // Bar
-            canvas.drawRect(x, top, x + barW, barBottom, barPaint);
-
-            // Top cap glow
-            Paint capPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-            capPaint.setColor(0xFFAAFFCC);
+            canvas.drawRect(x2 - 2.0f, top - 2.0f, x2 + barW + 2.0f, barBottom + 2.0f, this.barGlow);
+            canvas.drawRect(x2, top, x2 + barW, barBottom, this.barPaint);
+            Paint capPaint = new Paint(1);
+            capPaint.setColor(-5570612);
             capPaint.setStyle(Paint.Style.FILL);
-            canvas.drawRect(x, top, x + barW, top + 2f, capPaint);
+            canvas.drawRect(x2, top, x2 + barW, top + 2.0f, capPaint);
+            i3++;
+            f = f;
+            labelPaint = labelPaint;
         }
-
-        // Label
-        canvas.drawText("FREQ", mid + 4f, h - 8f, labelPaint);
-
-        // Separator line
+        float f2 = f;
+        canvas.drawText("FREQ", 4.0f + mid, h - f2, labelPaint);
         Paint sep = new Paint();
-        sep.setColor(0x33005500);
-        sep.setStrokeWidth(1f);
-        canvas.drawLine(mid, 8f, mid, h - 8f, sep);
+        sep.setColor(855659776);
+        sep.setStrokeWidth(1.0f);
+        canvas.drawLine(mid, 8.0f, mid, h - f2, sep);
     }
 }
