@@ -43,7 +43,7 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
     private static final int PORT_VIDEO       = 9998;
     private static final int PORT_COMMAND     = 9997;
     private static final int VIDEO_QUEUE_SIZE = 2;
-    private static final int VIDEO_TIMEOUT_MS = 8000;
+    private static final int VIDEO_TIMEOUT_MS = 15000;
 
     private String  deviceName, deviceIp;
     private int     sampleRate, audioMode;
@@ -330,7 +330,8 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
                 MediaCodec decoder = null;
                 try {
                     socket = new Socket();
-                    socket.connect(new InetSocketAddress(deviceIp, PORT_VIDEO), 5000);
+                    Thread.sleep(1500);
+                socket.connect(new InetSocketAddress(deviceIp, PORT_VIDEO), 5000);
                     socket.setTcpNoDelay(true);
                     socket.setSoTimeout(VIDEO_TIMEOUT_MS);
                     socket.setKeepAlive(true);
