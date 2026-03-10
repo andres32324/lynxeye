@@ -16,11 +16,7 @@ import android.os.IBinder;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.ImageButton;
-import android.media.MediaCodec;
-import android.media.MediaFormat;
-import android.view.Surface;
-import android.view.TextureView;
-import java.nio.ByteBuffer;
+import android.widget.ImageView;
 import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -43,7 +39,7 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
     private static final int PORT_VIDEO       = 9998;
     private static final int PORT_COMMAND     = 9997;
     private static final int VIDEO_QUEUE_SIZE = 2;
-    private static final int VIDEO_TIMEOUT_MS = 15000;
+    private static final int VIDEO_TIMEOUT_MS = 8000;
 
     private String  deviceName, deviceIp;
     private int     sampleRate, audioMode;
@@ -51,9 +47,7 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
 
     // UI
     private TextView    tvStatus, tvDeviceName, tvRecTime;
-    private TextureView textureView;
-    private volatile Surface decoderSurface = null;
-    private volatile MediaCodec videoDecoder = null;
+    private ImageView   ivVideo;
     private ImageButton btnRecord, btnSwitchCam, btnScreenshot, btnVideoToggle, btnAudioToggle;
     private android.widget.Button btnEq;
     private ImageButton btnNight;
@@ -119,14 +113,7 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
         tvStatus       = findViewById(R.id.tvStatus);
         tvDeviceName   = findViewById(R.id.tvDeviceName);
         tvRecTime      = findViewById(R.id.tvRecTime);
-        textureView = findViewById(R.id.textureView);
-        textureView.setSurfaceTextureListener(new TextureView.SurfaceTextureListener() {
-            @Override
-            public void onSurfaceTextureAvailable(android.graphics.SurfaceTexture st, int w, int h) { decoderSurface = new Surface(st); }
-            @Override public void onSurfaceTextureSizeChanged(android.graphics.SurfaceTexture st, int w, int h) {}
-            @Override public boolean onSurfaceTextureDestroyed(android.graphics.SurfaceTexture st) { decoderSurface = null; return true; }
-            @Override public void onSurfaceTextureUpdated(android.graphics.SurfaceTexture st) { lastFrame = textureView.getBitmap(); }
-        });
+        ivVideo        = findViewById(R.id.ivVideo);
         btnRecord      = findViewById(R.id.btnRecord);
         btnSwitchCam   = findViewById(R.id.btnSwitchCam);
         btnScreenshot  = findViewById(R.id.btnScreenshot);
@@ -148,9 +135,12 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
 
         running = true;
         if (videoEnabled) {
+            ivVideo.setBackgroundColor(0xFF111111);
             startVideoReceiver();
+            startVideoRenderer();
             startVideoWatchdog();
         } else {
+            ivVideo.setBackgroundColor(0xFF0A1A0A);
         }
 
         registerNetworkCallback();
@@ -191,13 +181,17 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
                         videoQueue.clear();
                         lastFrame = null;
                         runOnUiThread(() -> {
-                                        });
+                            ivVideo.setImageBitmap(null);
+                            ivVideo.setBackgroundColor(0xFF0A1A0A);
+                        });
                         stopVideoWatchdog();
                     }
                 } else if (Intent.ACTION_SCREEN_ON.equals(action)) {
                     if (videoEnabled && running) {
+                        runOnUiThread(() -> ivVideo.setBackgroundColor(0xFF111111));
                         startVideoReceiver();
-                                    startVideoWatchdog();
+                        startVideoRenderer();
+                        startVideoWatchdog();
                     }
                 }
             }
@@ -295,8 +289,6 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
                 if (audioMode == 1) sb.append("AUDIO_STEREO\n"); else sb.append("AUDIO_MONO\n");
                 sb.append("SR_").append(sampleRate).append("\n");
                 sb.append(videoEnabled ? "VIDEO_ON\n" : "VIDEO_OFF\n");
-                sb.append("START_AUDIO\n");
-                if (videoEnabled) sb.append("START_CAMERA\n");
                 cmd.getOutputStream().write(sb.toString().getBytes());
                 cmd.getOutputStream().flush();
                 cmd.close();
@@ -322,89 +314,60 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
     private void startVideoReceiver() {
         new Thread(() -> {
             while (running) {
-                if (decoderSurface == null) {
-                    try { Thread.sleep(200); } catch (InterruptedException e) { break; }
-                    continue;
-                }
                 Socket socket = null;
-                MediaCodec decoder = null;
                 try {
                     socket = new Socket();
-                    Thread.sleep(3000);
-                socket.connect(new InetSocketAddress(deviceIp, PORT_VIDEO), 5000);
+                    socket.connect(new InetSocketAddress(deviceIp, PORT_VIDEO), 5000);
                     socket.setTcpNoDelay(true);
                     socket.setSoTimeout(VIDEO_TIMEOUT_MS);
                     socket.setKeepAlive(true);
                     DataInputStream in = new DataInputStream(socket.getInputStream());
-                    decoder = MediaCodec.createDecoderByType("video/avc");
-                    videoDecoder = decoder;
-                    boolean configured = false;
                     videoConnected = true;
-                    lastFrameTime = System.currentTimeMillis();
+                    lastFrameTime  = System.currentTimeMillis();
                     runOnUiThread(() -> { tvStatus.setText("⬤  CONNECTED"); tvStatus.setTextColor(0xFF00E676); });
                     while (running && !socket.isClosed()) {
                         int len = in.readInt();
-                        if (len <= 0 || len > 10_000_000) continue;
-                        byte flags = in.readByte();
-                        byte[] data = new byte[len];
+                        if (len <= 0 || len > 3_000_000) continue;
+                        byte[] frame = new byte[len];
                         int total = 0;
-                        while (total < len) {
-                            int r = in.read(data, total, len - total);
-                            if (r < 0) break;
-                            total += r;
-                        }
+                        while (total < len) { int r = in.read(frame, total, len - total); if (r < 0) break; total += r; }
                         lastFrameTime = System.currentTimeMillis();
-                        boolean isConfig = (flags & 1) != 0;
-                        if (isConfig && !configured && decoderSurface != null) {
-                            int split = -1;
-                            for (int i = 1; i < data.length - 3; i++) {
-                                if (data[i]==0 && data[i+1]==0 && data[i+2]==0 && data[i+3]==1) {
-                                    split = i; break;
-                                }
-                            }
-                            MediaFormat format = MediaFormat.createVideoFormat("video/avc", 1280, 720);
-                            if (split > 0) {
-                                format.setByteBuffer("csd-0", ByteBuffer.wrap(data, 0, split));
-                                format.setByteBuffer("csd-1", ByteBuffer.wrap(data, split, data.length - split));
-                            } else {
-                                format.setByteBuffer("csd-0", ByteBuffer.wrap(data));
-                            }
-                            decoder.configure(format, decoderSurface, null, 0);
-                            decoder.start();
-                            configured = true;
-                            continue;
-                        }
-                        if (!configured) continue;
-                        int inIndex = decoder.dequeueInputBuffer(10_000);
-                        if (inIndex >= 0) {
-                            ByteBuffer inBuf = decoder.getInputBuffer(inIndex);
-                            if (inBuf != null) {
-                                inBuf.clear();
-                                inBuf.put(data);
-                                decoder.queueInputBuffer(inIndex, 0, data.length,
-                                        System.nanoTime() / 1000, 0);
-                            }
-                        }
-                        MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
-                        int outIndex = decoder.dequeueOutputBuffer(info, 0);
-                        if (outIndex >= 0) decoder.releaseOutputBuffer(outIndex, true);
+                        if (!videoQueue.offer(frame)) { videoQueue.poll(); videoQueue.offer(frame); }
                     }
                 } catch (Exception ignored) {
                 } finally {
                     videoConnected = false;
-                    if (decoder != null) {
-                        try { decoder.stop(); } catch (Exception ignored) {}
-                        try { decoder.release(); } catch (Exception ignored) {}
-                        videoDecoder = null;
-                    }
-                    if (socket != null) try { socket.close(); } catch (Exception ignored) {}
+                    videoQueue.clear();
+                    if (socket != null) try { socket.close(); } catch (Exception ignored2) {}
                     if (running) try { Thread.sleep(2000); } catch (InterruptedException e) { break; }
                 }
             }
         }, "VideoReceiver").start();
     }
 
-
+    private void startVideoRenderer() {
+        new Thread(() -> {
+            while (running) {
+                try {
+                    byte[] frame = videoQueue.poll(500, TimeUnit.MILLISECONDS);
+                    if (frame != null) {
+                        android.graphics.BitmapFactory.Options opts = new android.graphics.BitmapFactory.Options();
+                        opts.inPreferredConfig = android.graphics.Bitmap.Config.RGB_565;
+                        android.graphics.Bitmap bmp = android.graphics.BitmapFactory.decodeByteArray(frame, 0, frame.length, opts);
+                        if (bmp != null) {
+                            if (nightMode) bmp = applyNightFilter(bmp);
+                            lastFrame = bmp;
+                            final android.graphics.Bitmap display = bmp;
+                            runOnUiThread(() -> ivVideo.setImageBitmap(display));
+                        }
+                    } else if (lastFrame != null) {
+                        final android.graphics.Bitmap keep = lastFrame;
+                        runOnUiThread(() -> ivVideo.setImageBitmap(keep));
+                    }
+                } catch (InterruptedException e) { break; }
+            }
+        }, "VideoRenderer").start();
+    }
 
     // ─── Night Filter ─────────────────────────────────────
     private android.graphics.Bitmap applyNightFilter(android.graphics.Bitmap src) {
@@ -509,14 +472,17 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
             AppSettings.setVideoEnabled(this, nw);
             videoEnabled = nw;
             sendCommand(nw ? "VIDEO_ON" : "VIDEO_OFF");
-            sendCommand(nw ? "START_CAMERA" : "STOP_CAMERA");
             btnVideoToggle.setColorFilter(nw ? 0xFF00E676 : 0xFFFF3D3D);
             if (!nw) {
                 videoQueue.clear(); lastFrame = null;
-                    stopVideoWatchdog();
+                ivVideo.setImageBitmap(null);
+                ivVideo.setBackgroundColor(0xFF0A1A0A);
+                stopVideoWatchdog();
             } else {
-                    startVideoReceiver();
-                    startVideoWatchdog();
+                ivVideo.setBackgroundColor(0xFF111111);
+                startVideoReceiver();
+                startVideoRenderer();
+                startVideoWatchdog();
             }
         });
         btnVideoToggle.setColorFilter(videoEnabled ? 0xFF00E676 : 0xFFFF3D3D);
@@ -548,17 +514,9 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
 
         btnNight.setOnClickListener(v -> {
             nightMode = !nightMode;
-            if (nightMode) {
-                android.graphics.ColorMatrix cm = new android.graphics.ColorMatrix(new float[]{1.4f,0,0,0,80f,0,1.4f,0,0,80f,0,0,1.4f,0,80f,0,0,0,1,0});
-                textureView.setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null);
-                android.graphics.Paint p = new android.graphics.Paint();
-                p.setColorFilter(new android.graphics.ColorMatrixColorFilter(cm));
-                textureView.setLayerPaint(p);
-            } else {
-                textureView.setLayerPaint(null);
-            }
             btnNight.setColorFilter(nightMode ? 0xFFFFFF00 : 0xFF00E676);
             lastFrame = null;
+            runOnUiThread(() -> ivVideo.setImageBitmap(null));
             Toast.makeText(this, nightMode ? "Modo noche ON" : "Modo noche OFF", Toast.LENGTH_SHORT).show();
         });
         btnNight.setColorFilter(0xFF00E676);

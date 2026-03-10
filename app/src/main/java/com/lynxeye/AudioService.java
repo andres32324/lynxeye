@@ -15,7 +15,6 @@ import android.media.audiofx.NoiseSuppressor;
 import android.os.Binder;
 import android.os.Build;
 import android.os.IBinder;
-import android.os.PowerManager;
 import androidx.core.app.NotificationCompat;
 
 import java.io.InputStream;
@@ -37,7 +36,6 @@ public class AudioService extends Service {
     private static final String NOTIF_CHANNEL = "lynxeye_audio";
     private static final int    NOTIF_ID      = 77;
     private static final int    PORT_AUDIO    = 9999;
-    private static final int    PORT_COMMAND  = 9997;
     private static final int    QUEUE_SIZE    = 3;
 
     public class AudioBinder extends Binder {
@@ -61,10 +59,8 @@ public class AudioService extends Service {
     private AudioManager      audioManager;
     private AudioFocusRequest audioFocusRequest;
 
-    // WakeLock solo activo cuando transmite
-    private PowerManager.WakeLock wakeLock;
-
     private final BlockingQueue<byte[]> audioQueue = new ArrayBlockingQueue<>(QUEUE_SIZE);
+    // Referencia al socket activo para poder cerrarlo desde setAudioEnabled
     private volatile Socket audioSocket = null;
 
     private File             recordingFile;
@@ -76,6 +72,7 @@ public class AudioService extends Service {
     }
     private Callback callback;
 
+    // ─── Lifecycle ────────────────────────────────────────
     @Override public IBinder onBind(Intent intent) { return binder; }
 
     @Override
@@ -106,31 +103,10 @@ public class AudioService extends Service {
         if (noiseSup) setupNoiseSuppressor();
         dspEq = new DspEqualizer(sr);
         running = true;
-        audioEnabled = true;
-        sendStartCommands();
+        audioEnabled = true; // Siempre arranca con audio habilitado
         startAudioReceiver();
         startAudioPlayer();
         showNotification("Conectando...");
-    }
-
-
-    private void sendStartCommands() {
-        new Thread(() -> {
-            try {
-                Thread.sleep(500);
-                Socket s = new Socket();
-                s.connect(new InetSocketAddress(deviceIp, PORT_COMMAND), 2000);
-                StringBuilder sb = new StringBuilder();
-                sb.append(audioMode == 1 ? "AUDIO_STEREO\n" : "AUDIO_MONO\n");
-                sb.append("SR_").append(sampleRate).append("\n");
-                sb.append(AppSettings.isVideoEnabled(this) ? "VIDEO_ON\n" : "VIDEO_OFF\n");
-                sb.append("START_AUDIO\n");
-                if (AppSettings.isVideoEnabled(this)) sb.append("START_CAMERA\n");
-                s.getOutputStream().write(sb.toString().getBytes());
-                s.getOutputStream().flush();
-                s.close();
-            } catch (Exception ignored) {}
-        }).start();
     }
 
     public void stopMonitoring() { stopSelf(); }
@@ -140,15 +116,15 @@ public class AudioService extends Service {
         audioEnabled = enabled;
         if (!enabled) {
             audioQueue.clear();
+            // Cerrar socket activo → Menu Claro detecta desconexión → apaga mic → LED apaga
             Socket s = audioSocket;
             if (s != null && !s.isClosed()) {
                 try { s.close(); } catch (Exception ignored) {}
             }
             audioSocket = null;
-            // WakeLock innecesario si no hay audio
-            releaseWakeLock();
             updateNotification("Audio pausado");
         } else {
+            // AudioReceiver reconecta automáticamente cuando audioEnabled=true
             updateNotification("Reconectando...");
         }
     }
@@ -157,20 +133,6 @@ public class AudioService extends Service {
     public float getGain(int band) { return dspEq != null ? dspEq.getGain(band) : 0; }
     public boolean isRunning() { return running; }
     public String getDeviceIp() { return deviceIp; }
-
-    // ─── WakeLock inteligente ─────────────────────────────
-    private void acquireWakeLock() {
-        if (wakeLock != null && wakeLock.isHeld()) return;
-        PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
-        wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "LynxEye::AudioWakeLock");
-        wakeLock.acquire();
-    }
-
-    private void releaseWakeLock() {
-        if (wakeLock != null && wakeLock.isHeld()) {
-            wakeLock.release();
-        }
-    }
 
     // ─── Recording ────────────────────────────────────────
     public boolean startRecording(File dir) {
@@ -249,6 +211,7 @@ public class AudioService extends Service {
     private void startAudioReceiver() {
         new Thread(() -> {
             while (running) {
+                // Si audio está deshabilitado, esperar sin conectar
                 if (!audioEnabled) {
                     try { Thread.sleep(500); } catch (InterruptedException e) { break; }
                     continue;
@@ -256,15 +219,11 @@ public class AudioService extends Service {
                 Socket socket = null;
                 try {
                     socket = new Socket();
-                    socket.connect(new InetSocketAddress(deviceIp, PORT_AUDIO), 15000);
+                    socket.connect(new InetSocketAddress(deviceIp, PORT_AUDIO), 5000);
                     socket.setTcpNoDelay(true);
-                    socket.setSoTimeout(20000);
+                    socket.setSoTimeout(10000);
                     socket.setKeepAlive(true);
-                    audioSocket = socket;
-
-                    // WakeLock activo solo cuando hay audio 🔋
-                    acquireWakeLock();
-
+                    audioSocket = socket; // Guardar referencia
                     InputStream in = socket.getInputStream();
                     byte[] buf = new byte[4096];
                     audioConnected = true;
@@ -285,12 +244,10 @@ public class AudioService extends Service {
                     audioSocket = null;
                     notifyCallback(false);
                     audioQueue.clear();
-                    // WakeLock liberar cuando no hay audio 🔋
-                    releaseWakeLock();
                     if (socket != null) try { socket.close(); } catch (Exception ignored2) {}
                     if (running && audioEnabled) {
                         updateNotification("Reconectando...");
-                        try { Thread.sleep(4000); } catch (InterruptedException e) { break; }
+                        try { Thread.sleep(2000); } catch (InterruptedException e) { break; }
                     } else {
                         updateNotification("Audio pausado");
                     }
@@ -329,7 +286,6 @@ public class AudioService extends Service {
         if (audioManager != null && audioFocusRequest != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             audioManager.abandonAudioFocusRequest(audioFocusRequest);
         }
-        releaseWakeLock();
         stopForeground(true);
     }
 
@@ -345,7 +301,7 @@ public class AudioService extends Service {
 
     private void updateNotification(String text) {
         NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-        if (nm != null) nm.notify(NOTIF_ID, buildNotification(text));
+        nm.notify(NOTIF_ID, buildNotification(text));
     }
 
     private Notification buildNotification(String text) {
