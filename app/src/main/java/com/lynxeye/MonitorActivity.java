@@ -496,6 +496,7 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
             if (audioService == null) return;
             boolean nw = !audioService.audioEnabled;
             audioService.setAudioEnabled(nw);
+            sendCommand(nw ? "START_AUDIO" : "STOP_AUDIO");
             btnAudioToggle.setColorFilter(nw ? 0xFF00E676 : 0xFFFF3D3D);
         });
         btnAudioToggle.setColorFilter(0xFF00E676);
