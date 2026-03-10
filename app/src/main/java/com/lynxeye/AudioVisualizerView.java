@@ -1,111 +1,78 @@
 package com.lynxeye;
 
 import android.content.Context;
-import android.graphics.BlurMaskFilter;
 import android.graphics.Canvas;
+import android.graphics.Color;
 import android.graphics.Paint;
 import android.util.AttributeSet;
 import android.view.View;
-import kotlin.UByte;
 
-/* JADX INFO: loaded from: classes3.dex */
 public class AudioVisualizerView extends View {
-    private final Paint glowPaint;
-    private byte[] lastChunk;
-    private float[] points;
-    private final Paint wavePaint;
 
-    public AudioVisualizerView(Context ctx) {
-        super(ctx);
-        this.wavePaint = new Paint(1);
-        this.glowPaint = new Paint(1);
-        this.points = new float[0];
-        this.lastChunk = new byte[0];
-        init();
-    }
+    private final Paint wavePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint glowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private float[] points = new float[0];
+    private byte[]  lastChunk = new byte[0];
 
-    public AudioVisualizerView(Context ctx, AttributeSet a) {
-        super(ctx, a);
-        this.wavePaint = new Paint(1);
-        this.glowPaint = new Paint(1);
-        this.points = new float[0];
-        this.lastChunk = new byte[0];
-        init();
-    }
+    public AudioVisualizerView(Context ctx) { super(ctx); init(); }
+    public AudioVisualizerView(Context ctx, AttributeSet a) { super(ctx, a); init(); }
 
     private void init() {
-        this.wavePaint.setColor(-16718218);
-        this.wavePaint.setStrokeWidth(2.0f);
-        this.wavePaint.setStyle(Paint.Style.STROKE);
-        this.glowPaint.setColor(1140909686);
-        this.glowPaint.setStrokeWidth(6.0f);
-        this.glowPaint.setStyle(Paint.Style.STROKE);
-        this.glowPaint.setMaskFilter(new BlurMaskFilter(8.0f, BlurMaskFilter.Blur.NORMAL));
+        wavePaint.setColor(0xFF00E676);
+        wavePaint.setStrokeWidth(2f);
+        wavePaint.setStyle(Paint.Style.STROKE);
+
+        glowPaint.setColor(0x4400E676);
+        glowPaint.setStrokeWidth(6f);
+        glowPaint.setStyle(Paint.Style.STROKE);
+        glowPaint.setMaskFilter(new android.graphics.BlurMaskFilter(8f, android.graphics.BlurMaskFilter.Blur.NORMAL));
     }
 
     public void updateAudio(byte[] chunk) {
-        if (chunk == null || chunk.length < 2) {
-            return;
-        }
-        this.lastChunk = chunk;
+        if (chunk == null || chunk.length < 2) return;
+        lastChunk = chunk;
         postInvalidate();
     }
 
-    @Override // android.view.View
+    @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
-        canvas.drawColor(-15658735);
+        canvas.drawColor(0xFF111111);
+
         int w = getWidth();
         int h = getHeight();
-        if (w == 0 || h == 0) {
-            return;
-        }
-        byte[] bArr = this.lastChunk;
-        int i = 2;
-        if (bArr.length < 2) {
-            return;
-        }
-        int samples = bArr.length / 2;
+        if (w == 0 || h == 0 || lastChunk.length < 2) return;
+
+        int samples = lastChunk.length / 2;
         int step = Math.max(1, samples / w);
         int numPoints = samples / step;
-        if (this.points.length != numPoints * 4) {
-            this.points = new float[numPoints * 4];
+
+        if (points.length != numPoints * 4) points = new float[numPoints * 4];
+
+        float cx = w / 2f;
+        float cy = h / 2f;
+        float scaleY = cy * 0.85f;
+
+        for (int i = 0; i < numPoints - 1; i++) {
+            int idx1 = i * step * 2;
+            int idx2 = (i + 1) * step * 2;
+            if (idx2 + 1 >= lastChunk.length) break;
+
+            short s1 = (short) ((lastChunk[idx1 + 1] << 8) | (lastChunk[idx1] & 0xFF));
+            short s2 = (short) ((lastChunk[idx2 + 1] << 8) | (lastChunk[idx2] & 0xFF));
+
+            float x1 = (float) i / numPoints * w;
+            float x2 = (float) (i + 1) / numPoints * w;
+            float y1 = cy - (s1 / 32768f) * scaleY;
+            float y2 = cy - (s2 / 32768f) * scaleY;
+
+            points[i * 4]     = x1;
+            points[i * 4 + 1] = y1;
+            points[i * 4 + 2] = x2;
+            points[i * 4 + 3] = y2;
         }
-        float f = w / 2.0f;
-        float cy = h / 2.0f;
-        float scaleY = 0.85f * cy;
-        int i2 = 0;
-        while (i2 < numPoints - 1) {
-            int idx1 = i2 * step * i;
-            int idx2 = (i2 + 1) * step * i;
-            int i3 = idx2 + 1;
-            byte[] bArr2 = this.lastChunk;
-            if (i3 >= bArr2.length) {
-                break;
-            }
-            short s1 = (short) ((bArr2[idx1 + 1] << 8) | (bArr2[idx1] & UByte.MAX_VALUE));
-            short s2 = (short) ((bArr2[idx2] & UByte.MAX_VALUE) | (bArr2[idx2 + 1] << 8));
-            int h2 = h;
-            float x1 = (i2 / numPoints) * w;
-            int samples2 = samples;
-            float x2 = ((i2 + 1) / numPoints) * w;
-            float y1 = cy - ((s1 / 32768.0f) * scaleY);
-            int w2 = w;
-            float y2 = cy - ((s2 / 32768.0f) * scaleY);
-            int step2 = step;
-            float[] fArr = this.points;
-            fArr[i2 * 4] = x1;
-            fArr[(i2 * 4) + 1] = y1;
-            fArr[(i2 * 4) + 2] = x2;
-            fArr[(i2 * 4) + 3] = y2;
-            i2++;
-            i = 2;
-            h = h2;
-            samples = samples2;
-            step = step2;
-            w = w2;
-        }
-        canvas.drawLines(this.points, this.glowPaint);
-        canvas.drawLines(this.points, this.wavePaint);
+
+        canvas.drawLines(points, glowPaint);
+        canvas.drawLines(points, wavePaint);
     }
 }
