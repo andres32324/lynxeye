@@ -8,22 +8,22 @@ import android.app.Service;
 import android.content.Intent;
 import android.media.AudioAttributes;
 import android.media.AudioFocusRequest;
-import android.media.AudioManager;
 import android.media.AudioFormat;
+import android.media.AudioManager;
 import android.media.AudioTrack;
 import android.media.audiofx.NoiseSuppressor;
 import android.os.Binder;
-import android.os.Build;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import androidx.core.app.NotificationCompat;
-
-import java.io.InputStream;
-import java.net.InetSocketAddress;
-import java.net.Socket;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.RandomAccessFile;
+import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
@@ -31,330 +31,471 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 
+/* JADX INFO: loaded from: classes3.dex */
 public class AudioService extends Service {
-
     private static final String NOTIF_CHANNEL = "lynxeye_audio";
-    private static final int    NOTIF_ID      = 77;
-    private static final int    PORT_AUDIO    = 9999;
-    private static final int    QUEUE_SIZE    = 3;
-
-    public class AudioBinder extends Binder {
-        public AudioService getService() { return AudioService.this; }
-    }
-    private final IBinder binder = new AudioBinder();
-
-    private String  deviceIp;
-    private String  deviceName;
-    private int     sampleRate;
-    private int     audioMode;
-
-    private volatile boolean running        = false;
-    public  volatile boolean audioEnabled   = true;
-    public  volatile boolean audioConnected = false;
-    private volatile boolean isRecording    = false;
-
-    private AudioTrack        audioTrack;
-    private DspEqualizer      dspEq;
-    private NoiseSuppressor   noiseSuppressor;
-    private AudioManager      audioManager;
+    private static final int NOTIF_ID = 77;
+    private static final int PORT_AUDIO = 9999;
+    private static final int QUEUE_SIZE = 3;
     private AudioFocusRequest audioFocusRequest;
-
-    private final BlockingQueue<byte[]> audioQueue = new ArrayBlockingQueue<>(QUEUE_SIZE);
-    // Referencia al socket activo para poder cerrarlo desde setAudioEnabled
-    private volatile Socket audioSocket = null;
-
-    private File             recordingFile;
+    private AudioManager audioManager;
+    private int audioMode;
+    private AudioTrack audioTrack;
+    private Callback callback;
+    private String deviceIp;
+    private String deviceName;
+    private DspEqualizer dspEq;
+    private NoiseSuppressor noiseSuppressor;
+    private File recordingFile;
     private FileOutputStream recordingStream;
-    private long             totalAudioBytes = 0;
+    private int sampleRate;
+    private final IBinder binder = new AudioBinder();
+    private volatile boolean running = false;
+    public volatile boolean audioEnabled = true;
+    public volatile boolean audioConnected = false;
+    private volatile boolean isRecording = false;
+    private final BlockingQueue<byte[]> audioQueue = new ArrayBlockingQueue(3);
+    private volatile Socket audioSocket = null;
+    private long totalAudioBytes = 0;
 
     public interface Callback {
-        void onAudioConnected(boolean connected);
+        void onAudioConnected(boolean z);
     }
-    private Callback callback;
 
-    // ─── Lifecycle ────────────────────────────────────────
-    @Override public IBinder onBind(Intent intent) { return binder; }
+    public class AudioBinder extends Binder {
+        public AudioBinder() {
+        }
 
-    @Override
+        public AudioService getService() {
+            return AudioService.this;
+        }
+    }
+
+    @Override // android.app.Service
+    public IBinder onBind(Intent intent) {
+        return this.binder;
+    }
+
+    @Override // android.app.Service
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent != null && "STOP".equals(intent.getAction())) {
-            stopSelf(); return START_NOT_STICKY;
+            stopSelf();
+            return 2;
         }
-        return START_STICKY;
+        return 1;
     }
 
-    @Override public void onDestroy() { super.onDestroy(); stopAudio(); }
+    @Override // android.app.Service
+    public void onDestroy() {
+        super.onDestroy();
+        stopAudio();
+    }
 
-    // ─── Public API ───────────────────────────────────────
     public void startMonitoring(String ip, String name, int sr, int mode, boolean noiseSup) {
-        if (running && ip.equals(deviceIp)) return;
-        if (running) {
-            running = false;
-            audioQueue.clear();
-            try { Thread.sleep(300); } catch (Exception ignored) {}
-            if (audioTrack != null) { try { audioTrack.stop(); audioTrack.release(); } catch (Exception ignored) {} audioTrack = null; }
-            if (noiseSuppressor != null) { try { noiseSuppressor.release(); } catch (Exception ignored) {} noiseSuppressor = null; }
+        if (this.running && ip.equals(this.deviceIp)) {
+            return;
         }
-        this.deviceIp   = ip;
+        if (this.running) {
+            this.running = false;
+            this.audioQueue.clear();
+            try {
+                Thread.sleep(300L);
+            } catch (Exception e) {
+            }
+            AudioTrack audioTrack = this.audioTrack;
+            if (audioTrack != null) {
+                try {
+                    audioTrack.stop();
+                    this.audioTrack.release();
+                } catch (Exception e2) {
+                }
+                this.audioTrack = null;
+            }
+            NoiseSuppressor noiseSuppressor = this.noiseSuppressor;
+            if (noiseSuppressor != null) {
+                try {
+                    noiseSuppressor.release();
+                } catch (Exception e3) {
+                }
+                this.noiseSuppressor = null;
+            }
+        }
+        this.deviceIp = ip;
         this.deviceName = name;
         this.sampleRate = sr;
-        this.audioMode  = mode;
+        this.audioMode = mode;
         setupAudioTrack();
-        if (noiseSup) setupNoiseSuppressor();
-        dspEq = new DspEqualizer(sr);
-        running = true;
-        audioEnabled = true; // Siempre arranca con audio habilitado
+        if (noiseSup) {
+            setupNoiseSuppressor();
+        }
+        this.dspEq = new DspEqualizer(sr);
+        this.running = true;
+        this.audioEnabled = true;
         startAudioReceiver();
         startAudioPlayer();
         showNotification("Conectando...");
     }
 
-    public void stopMonitoring() { stopSelf(); }
-    public void setCallback(Callback cb) { this.callback = cb; }
+    public void stopMonitoring() {
+        stopSelf();
+    }
+
+    public void setCallback(Callback cb) {
+        this.callback = cb;
+    }
 
     public void setAudioEnabled(boolean enabled) {
-        audioEnabled = enabled;
+        this.audioEnabled = enabled;
         if (!enabled) {
-            audioQueue.clear();
-            // Cerrar socket activo → Menu Claro detecta desconexión → apaga mic → LED apaga
-            Socket s = audioSocket;
+            this.audioQueue.clear();
+            Socket s = this.audioSocket;
             if (s != null && !s.isClosed()) {
-                try { s.close(); } catch (Exception ignored) {}
+                try {
+                    s.close();
+                } catch (Exception e) {
+                }
             }
-            audioSocket = null;
+            this.audioSocket = null;
             updateNotification("Audio pausado");
-        } else {
-            // AudioReceiver reconecta automáticamente cuando audioEnabled=true
-            updateNotification("Reconectando...");
+            return;
+        }
+        updateNotification("Reconectando...");
+    }
+
+    public void setGain(int band, float db) {
+        DspEqualizer dspEqualizer = this.dspEq;
+        if (dspEqualizer != null) {
+            dspEqualizer.setGain(band, db);
         }
     }
 
-    public void setGain(int band, float db) { if (dspEq != null) dspEq.setGain(band, db); }
-    public float getGain(int band) { return dspEq != null ? dspEq.getGain(band) : 0; }
-    public boolean isRunning() { return running; }
-    public String getDeviceIp() { return deviceIp; }
+    public float getGain(int band) {
+        DspEqualizer dspEqualizer = this.dspEq;
+        if (dspEqualizer != null) {
+            return dspEqualizer.getGain(band);
+        }
+        return 0.0f;
+    }
 
-    // ─── Recording ────────────────────────────────────────
+    public boolean isRunning() {
+        return this.running;
+    }
+
+    public String getDeviceIp() {
+        return this.deviceIp;
+    }
+
     public boolean startRecording(File dir) {
         try {
-            String fn = "LynxEye_" + new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss",
-                    Locale.getDefault()).format(new Date()) + ".wav";
-            recordingFile   = new File(dir, fn);
-            recordingStream = new FileOutputStream(recordingFile);
-            int ch = audioMode == 1 ? 2 : 1;
-            writeWavHeader(recordingStream, 0, sampleRate, ch);
-            totalAudioBytes = 0;
-            isRecording = true;
+            String fn = "LynxEye_" + new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.getDefault()).format(new Date()) + ".wav";
+            this.recordingFile = new File(dir, fn);
+            FileOutputStream fileOutputStream = new FileOutputStream(this.recordingFile);
+            this.recordingStream = fileOutputStream;
+            int ch = this.audioMode == 1 ? 2 : 1;
+            writeWavHeader(fileOutputStream, 0L, this.sampleRate, ch);
+            this.totalAudioBytes = 0L;
+            this.isRecording = true;
             return true;
-        } catch (Exception e) { return false; }
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     public File stopRecording() {
-        isRecording = false;
+        this.isRecording = false;
         try {
-            if (recordingStream != null) { recordingStream.flush(); recordingStream.close(); recordingStream = null; }
-            if (recordingFile != null && recordingFile.exists()) {
-                int ch = audioMode == 1 ? 2 : 1;
-                updateWavHeader(recordingFile, totalAudioBytes, sampleRate, ch);
-                return recordingFile;
+            FileOutputStream fileOutputStream = this.recordingStream;
+            if (fileOutputStream != null) {
+                fileOutputStream.flush();
+                this.recordingStream.close();
+                this.recordingStream = null;
             }
-        } catch (Exception e) { e.printStackTrace(); }
+            File file = this.recordingFile;
+            if (file != null && file.exists()) {
+                int ch = this.audioMode == 1 ? 2 : 1;
+                updateWavHeader(this.recordingFile, this.totalAudioBytes, this.sampleRate, ch);
+                return this.recordingFile;
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
         return null;
     }
 
-    public boolean isRecording() { return isRecording; }
+    public boolean isRecording() {
+        return this.isRecording;
+    }
 
-    // ─── Audio Setup ──────────────────────────────────────
     private void requestAudioFocus() {
-        audioManager = (AudioManager) getSystemService(AUDIO_SERVICE);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            AudioAttributes attrs = new AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_MEDIA)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build();
-            audioFocusRequest = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
-                    .setAudioAttributes(attrs)
-                    .setAcceptsDelayedFocusGain(true)
-                    .setOnAudioFocusChangeListener(focusChange -> {})
-                    .build();
-            audioManager.requestAudioFocus(audioFocusRequest);
-        } else {
-            audioManager.requestAudioFocus(null, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN);
-        }
+        this.audioManager = (AudioManager) getSystemService("audio");
+        AudioAttributes attrs = new AudioAttributes.Builder().setUsage(1).setContentType(1).build();
+        AudioFocusRequest audioFocusRequestBuild = new AudioFocusRequest.Builder(1).setAudioAttributes(attrs).setAcceptsDelayedFocusGain(true).setOnAudioFocusChangeListener(new AudioManager.OnAudioFocusChangeListener() { // from class: com.lynxeye.AudioService$$ExternalSyntheticLambda0
+            @Override // android.media.AudioManager.OnAudioFocusChangeListener
+            public final void onAudioFocusChange(int i) {
+                AudioService.lambda$requestAudioFocus$0(i);
+            }
+        }).build();
+        this.audioFocusRequest = audioFocusRequestBuild;
+        this.audioManager.requestAudioFocus(audioFocusRequestBuild);
+    }
+
+    static /* synthetic */ void lambda$requestAudioFocus$0(int focusChange) {
     }
 
     private void setupAudioTrack() {
         requestAudioFocus();
-        int ch  = audioMode == 1 ? AudioFormat.CHANNEL_OUT_STEREO : AudioFormat.CHANNEL_OUT_MONO;
-        int min = AudioTrack.getMinBufferSize(sampleRate, ch, AudioFormat.ENCODING_PCM_16BIT);
-        audioTrack = new AudioTrack.Builder()
-                .setAudioAttributes(new AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_MEDIA)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())
-                .setAudioFormat(new AudioFormat.Builder()
-                        .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
-                        .setSampleRate(sampleRate).setChannelMask(ch).build())
-                .setBufferSizeInBytes(min * 2)
-                .setTransferMode(AudioTrack.MODE_STREAM).build();
-        audioTrack.play();
+        int ch = this.audioMode == 1 ? 12 : 4;
+        int min = AudioTrack.getMinBufferSize(this.sampleRate, ch, 2);
+        AudioTrack audioTrackBuild = new AudioTrack.Builder().setAudioAttributes(new AudioAttributes.Builder().setUsage(1).setContentType(1).build()).setAudioFormat(new AudioFormat.Builder().setEncoding(2).setSampleRate(this.sampleRate).setChannelMask(ch).build()).setBufferSizeInBytes(min * 2).setTransferMode(1).build();
+        this.audioTrack = audioTrackBuild;
+        audioTrackBuild.play();
     }
 
     private void setupNoiseSuppressor() {
         try {
             if (NoiseSuppressor.isAvailable()) {
-                noiseSuppressor = NoiseSuppressor.create(audioTrack.getAudioSessionId());
-                if (noiseSuppressor != null) noiseSuppressor.setEnabled(true);
+                NoiseSuppressor noiseSuppressorCreate = NoiseSuppressor.create(this.audioTrack.getAudioSessionId());
+                this.noiseSuppressor = noiseSuppressorCreate;
+                if (noiseSuppressorCreate != null) {
+                    noiseSuppressorCreate.setEnabled(true);
+                }
             }
-        } catch (Exception ignored) {}
+        } catch (Exception e) {
+        }
     }
 
-    // ─── Audio Receiver ───────────────────────────────────
     private void startAudioReceiver() {
-        new Thread(() -> {
-            while (running) {
-                // Si audio está deshabilitado, esperar sin conectar
-                if (!audioEnabled) {
-                    try { Thread.sleep(500); } catch (InterruptedException e) { break; }
-                    continue;
-                }
-                Socket socket = null;
-                try {
-                    socket = new Socket();
-                    socket.connect(new InetSocketAddress(deviceIp, PORT_AUDIO), 5000);
-                    socket.setTcpNoDelay(true);
-                    socket.setSoTimeout(10000);
-                    socket.setKeepAlive(true);
-                    audioSocket = socket; // Guardar referencia
-                    InputStream in = socket.getInputStream();
-                    byte[] buf = new byte[4096];
-                    audioConnected = true;
-                    notifyCallback(true);
-                    updateNotification("Audio activo");
-                    while (running && !socket.isClosed()) {
-                        int r = in.read(buf);
-                        if (r < 0) break;
-                        if (r > 0) {
-                            byte[] chunk = new byte[r];
-                            System.arraycopy(buf, 0, chunk, 0, r);
-                            if (!audioQueue.offer(chunk)) { audioQueue.poll(); audioQueue.offer(chunk); }
-                        }
-                    }
-                } catch (Exception ignored) {
-                } finally {
-                    audioConnected = false;
-                    audioSocket = null;
-                    notifyCallback(false);
-                    audioQueue.clear();
-                    if (socket != null) try { socket.close(); } catch (Exception ignored2) {}
-                    if (running && audioEnabled) {
-                        updateNotification("Reconectando...");
-                        try { Thread.sleep(2000); } catch (InterruptedException e) { break; }
-                    } else {
-                        updateNotification("Audio pausado");
-                    }
-                }
+        new Thread(new Runnable() { // from class: com.lynxeye.AudioService$$ExternalSyntheticLambda1
+            @Override // java.lang.Runnable
+            public final void run() {
+                this.f$0.m141lambda$startAudioReceiver$1$comlynxeyeAudioService();
             }
         }, "AudioReceiver").start();
     }
 
-    // ─── Audio Player ─────────────────────────────────────
-    private void startAudioPlayer() {
-        new Thread(() -> {
-            while (running) {
+    /* JADX INFO: renamed from: lambda$startAudioReceiver$1$com-lynxeye-AudioService, reason: not valid java name */
+    /* synthetic */ void m141lambda$startAudioReceiver$1$comlynxeyeAudioService() {
+        int r;
+        while (this.running) {
+            if (!this.audioEnabled) {
                 try {
-                    byte[] chunk = audioQueue.poll(500, TimeUnit.MILLISECONDS);
-                    if (chunk != null) {
-                        if (dspEq != null) chunk = dspEq.process(chunk);
-                        if (audioEnabled) audioTrack.write(chunk, 0, chunk.length);
-                        if (isRecording && recordingStream != null) {
-                            try { recordingStream.write(chunk); totalAudioBytes += chunk.length; }
-                            catch (Exception ignored) {}
+                    Thread.sleep(500L);
+                } catch (InterruptedException e) {
+                    return;
+                }
+            } else {
+                Socket socket = null;
+                try {
+                    socket = new Socket();
+                    socket.connect(new InetSocketAddress(this.deviceIp, PORT_AUDIO), 5000);
+                    socket.setTcpNoDelay(true);
+                    socket.setSoTimeout(10000);
+                    socket.setKeepAlive(true);
+                    this.audioSocket = socket;
+                    InputStream in = socket.getInputStream();
+                    byte[] buf = new byte[4096];
+                    this.audioConnected = true;
+                    notifyCallback(true);
+                    updateNotification("Audio activo");
+                    while (this.running && !socket.isClosed() && (r = in.read(buf)) >= 0) {
+                        if (r > 0) {
+                            byte[] chunk = new byte[r];
+                            System.arraycopy(buf, 0, chunk, 0, r);
+                            if (!this.audioQueue.offer(chunk)) {
+                                this.audioQueue.poll();
+                                this.audioQueue.offer(chunk);
+                            }
                         }
                     }
-                } catch (InterruptedException e) { break; }
+                    this.audioConnected = false;
+                    this.audioSocket = null;
+                    notifyCallback(false);
+                    this.audioQueue.clear();
+                    try {
+                        socket.close();
+                    } catch (Exception e2) {
+                    }
+                } catch (Exception e3) {
+                    this.audioConnected = false;
+                    this.audioSocket = null;
+                    notifyCallback(false);
+                    this.audioQueue.clear();
+                    if (socket != null) {
+                        try {
+                            socket.close();
+                        } catch (Exception e4) {
+                        }
+                    }
+                    if (this.running && this.audioEnabled) {
+                        updateNotification("Reconectando...");
+                        Thread.sleep(2000L);
+                    }
+                } catch (Throwable th) {
+                    this.audioConnected = false;
+                    this.audioSocket = null;
+                    notifyCallback(false);
+                    this.audioQueue.clear();
+                    if (socket != null) {
+                        try {
+                            socket.close();
+                        } catch (Exception e5) {
+                        }
+                    }
+                    if (this.running && this.audioEnabled) {
+                        updateNotification("Reconectando...");
+                        Thread.sleep(2000L);
+                        throw th;
+                    }
+                    updateNotification("Audio pausado");
+                    throw th;
+                }
+                if (this.running && this.audioEnabled) {
+                    updateNotification("Reconectando...");
+                    try {
+                        Thread.sleep(2000L);
+                    } catch (InterruptedException e6) {
+                        return;
+                    }
+                } else {
+                    updateNotification("Audio pausado");
+                }
+            }
+        }
+    }
+
+    private void startAudioPlayer() {
+        new Thread(new Runnable() { // from class: com.lynxeye.AudioService$$ExternalSyntheticLambda2
+            @Override // java.lang.Runnable
+            public final void run() {
+                this.f$0.m140lambda$startAudioPlayer$2$comlynxeyeAudioService();
             }
         }, "AudioPlayer").start();
     }
 
+    /* JADX INFO: renamed from: lambda$startAudioPlayer$2$com-lynxeye-AudioService, reason: not valid java name */
+    /* synthetic */ void m140lambda$startAudioPlayer$2$comlynxeyeAudioService() {
+        FileOutputStream fileOutputStream;
+        while (this.running) {
+            try {
+                byte[] chunk = this.audioQueue.poll(500L, TimeUnit.MILLISECONDS);
+                if (chunk != null) {
+                    DspEqualizer dspEqualizer = this.dspEq;
+                    if (dspEqualizer != null) {
+                        chunk = dspEqualizer.process(chunk);
+                    }
+                    if (this.audioEnabled) {
+                        this.audioTrack.write(chunk, 0, chunk.length);
+                    }
+                    if (this.isRecording && (fileOutputStream = this.recordingStream) != null) {
+                        try {
+                            fileOutputStream.write(chunk);
+                            this.totalAudioBytes += (long) chunk.length;
+                        } catch (Exception e) {
+                        }
+                    }
+                }
+            } catch (InterruptedException e2) {
+                return;
+            }
+        }
+    }
+
     private void stopAudio() {
-        running = false;
-        audioQueue.clear();
-        Socket s = audioSocket;
-        if (s != null) { try { s.close(); } catch (Exception ignored) {} audioSocket = null; }
-        if (isRecording) stopRecording();
-        if (noiseSuppressor != null) { try { noiseSuppressor.release(); } catch (Exception ignored) {} }
-        if (audioTrack != null) { try { audioTrack.stop(); audioTrack.release(); } catch (Exception ignored) {} }
-        if (audioManager != null && audioFocusRequest != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            audioManager.abandonAudioFocusRequest(audioFocusRequest);
+        this.running = false;
+        this.audioQueue.clear();
+        Socket s = this.audioSocket;
+        if (s != null) {
+            try {
+                s.close();
+            } catch (Exception e) {
+            }
+            this.audioSocket = null;
+        }
+        if (this.isRecording) {
+            stopRecording();
+        }
+        NoiseSuppressor noiseSuppressor = this.noiseSuppressor;
+        if (noiseSuppressor != null) {
+            try {
+                noiseSuppressor.release();
+            } catch (Exception e2) {
+            }
+        }
+        AudioTrack audioTrack = this.audioTrack;
+        if (audioTrack != null) {
+            try {
+                audioTrack.stop();
+                this.audioTrack.release();
+            } catch (Exception e3) {
+            }
+        }
+        if (this.audioManager != null && this.audioFocusRequest != null) {
+            this.audioManager.abandonAudioFocusRequest(this.audioFocusRequest);
         }
         stopForeground(true);
     }
 
-    private void notifyCallback(boolean connected) {
-        if (callback != null) {
-            new android.os.Handler(android.os.Looper.getMainLooper())
-                    .post(() -> callback.onAudioConnected(connected));
+    private void notifyCallback(final boolean connected) {
+        if (this.callback != null) {
+            new Handler(Looper.getMainLooper()).post(new Runnable() { // from class: com.lynxeye.AudioService$$ExternalSyntheticLambda3
+                @Override // java.lang.Runnable
+                public final void run() {
+                    this.f$0.m139lambda$notifyCallback$3$comlynxeyeAudioService(connected);
+                }
+            });
         }
     }
 
-    // ─── Notification ─────────────────────────────────────
-    private void showNotification(String text) { createChannel(); startForeground(NOTIF_ID, buildNotification(text)); }
+    /* JADX INFO: renamed from: lambda$notifyCallback$3$com-lynxeye-AudioService, reason: not valid java name */
+    /* synthetic */ void m139lambda$notifyCallback$3$comlynxeyeAudioService(boolean connected) {
+        this.callback.onAudioConnected(connected);
+    }
+
+    private void showNotification(String text) {
+        createChannel();
+        startForeground(NOTIF_ID, buildNotification(text));
+    }
 
     private void updateNotification(String text) {
-        NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+        NotificationManager nm = (NotificationManager) getSystemService("notification");
         nm.notify(NOTIF_ID, buildNotification(text));
     }
 
     private Notification buildNotification(String text) {
-        Intent open = new Intent(this, MainActivity.class);
-        open.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
-        PendingIntent openPi = PendingIntent.getActivity(this, 0, open,
-                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        Intent stop = new Intent(this, AudioService.class);
+        Intent open = new Intent(this, (Class<?>) MainActivity.class);
+        open.setFlags(536870912);
+        PendingIntent openPi = PendingIntent.getActivity(this, 0, open, 201326592);
+        Intent stop = new Intent(this, (Class<?>) AudioService.class);
         stop.setAction("STOP");
-        PendingIntent stopPi = PendingIntent.getService(this, 1, stop,
-                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        return new NotificationCompat.Builder(this, NOTIF_CHANNEL)
-                .setContentTitle("LynxEye — " + deviceName)
-                .setContentText(text)
-                .setSmallIcon(android.R.drawable.ic_btn_speak_now)
-                .setContentIntent(openPi)
-                .addAction(android.R.drawable.ic_delete, "Detener", stopPi)
-                .setOngoing(true).build();
+        PendingIntent stopPi = PendingIntent.getService(this, 1, stop, 201326592);
+        return new NotificationCompat.Builder(this, NOTIF_CHANNEL).setContentTitle("LynxEye — " + this.deviceName).setContentText(text).setSmallIcon(android.R.drawable.ic_btn_speak_now).setContentIntent(openPi).addAction(android.R.drawable.ic_delete, "Detener", stopPi).setOngoing(true).build();
     }
 
     private void createChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationChannel ch = new NotificationChannel(
-                    NOTIF_CHANNEL, "LynxEye Audio", NotificationManager.IMPORTANCE_LOW);
-            ((NotificationManager) getSystemService(NOTIFICATION_SERVICE)).createNotificationChannel(ch);
-        }
+        NotificationChannel ch = new NotificationChannel(NOTIF_CHANNEL, "LynxEye Audio", 2);
+        ((NotificationManager) getSystemService("notification")).createNotificationChannel(ch);
     }
 
-    // ─── WAV ──────────────────────────────────────────────
     private void writeWavHeader(FileOutputStream out, long bytes, int sr, int ch) throws IOException {
-        long total = bytes + 36;
-        byte[] h = new byte[44];
-        h[0]='R';h[1]='I';h[2]='F';h[3]='F';
-        h[4]=(byte)total;h[5]=(byte)(total>>8);h[6]=(byte)(total>>16);h[7]=(byte)(total>>24);
-        h[8]='W';h[9]='A';h[10]='V';h[11]='E';
-        h[12]='f';h[13]='m';h[14]='t';h[15]=' ';
-        h[16]=16;h[20]=1;h[22]=(byte)ch;
-        h[24]=(byte)sr;h[25]=(byte)(sr>>8);h[26]=(byte)(sr>>16);h[27]=(byte)(sr>>24);
-        long br = (long)sr * ch * 2;
-        h[28]=(byte)br;h[29]=(byte)(br>>8);h[30]=(byte)(br>>16);h[31]=(byte)(br>>24);
-        h[32]=(byte)(ch*2);h[34]=16;
-        h[36]='d';h[37]='a';h[38]='t';h[39]='a';
-        h[40]=(byte)bytes;h[41]=(byte)(bytes>>8);h[42]=(byte)(bytes>>16);h[43]=(byte)(bytes>>24);
+        long total = 36 + bytes;
+        long br = ((long) sr) * ((long) ch) * 2;
+        byte[] h = {82, 73, 70, 70, (byte) total, (byte) (total >> 8), (byte) (total >> 16), (byte) (total >> 24), 87, 65, 86, 69, 102, 109, 116, 32, 16, 0, 0, 0, 1, 0, (byte) ch, 0, (byte) sr, (byte) (sr >> 8), (byte) (sr >> 16), (byte) (sr >> 24), (byte) br, (byte) (br >> 8), (byte) (br >> 16), (byte) (br >> 24), (byte) (ch * 2), 0, 16, 0, 100, 97, 116, 97, (byte) bytes, (byte) (bytes >> 8), (byte) (bytes >> 16), (byte) (bytes >> 24)};
         out.write(h);
     }
 
     private void updateWavHeader(File f, long bytes, int sr, int ch) throws IOException {
         RandomAccessFile raf = new RandomAccessFile(f, "rw");
-        long total = bytes + 36;
-        raf.seek(4);
-        raf.write((byte)total);raf.write((byte)(total>>8));raf.write((byte)(total>>16));raf.write((byte)(total>>24));
-        raf.seek(40);
-        raf.write((byte)bytes);raf.write((byte)(bytes>>8));raf.write((byte)(bytes>>16));raf.write((byte)(bytes>>24));
+        long total = 36 + bytes;
+        raf.seek(4L);
+        raf.write((byte) total);
+        raf.write((byte) (total >> 8));
+        raf.write((byte) (total >> 16));
+        raf.write((byte) (total >> 24));
+        raf.seek(40L);
+        raf.write((byte) bytes);
+        raf.write((byte) (bytes >> 8));
+        raf.write((byte) (bytes >> 16));
+        raf.write((byte) (bytes >> 24));
         raf.close();
     }
 }
