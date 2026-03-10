@@ -37,6 +37,7 @@ public class AudioService extends Service {
     private static final String NOTIF_CHANNEL = "lynxeye_audio";
     private static final int    NOTIF_ID      = 77;
     private static final int    PORT_AUDIO    = 9999;
+    private static final int    PORT_COMMAND  = 9997;
     private static final int    QUEUE_SIZE    = 3;
 
     public class AudioBinder extends Binder {
@@ -106,9 +107,29 @@ public class AudioService extends Service {
         dspEq = new DspEqualizer(sr);
         running = true;
         audioEnabled = true;
+        sendStartCommands();
         startAudioReceiver();
         startAudioPlayer();
         showNotification("Conectando...");
+    }
+
+    private void sendStartCommands() {
+        new Thread(() -> {
+            try {
+                Thread.sleep(500);
+                Socket s = new Socket();
+                s.connect(new InetSocketAddress(deviceIp, PORT_COMMAND), 2000);
+                String cmds = (audioMode == 1 ? "AUDIO_STEREO
+" : "AUDIO_MONO
+") + "SR_" + sampleRate + "
+" + (AppSettings.isVideoEnabled(this) ? "VIDEO_ON
+" : "VIDEO_OFF
+") + "START_AUDIO\n" + (AppSettings.isVideoEnabled(this) ? "START_CAMERA\n" : "");
+                s.getOutputStream().write(cmds.getBytes());
+                s.getOutputStream().flush();
+                s.close();
+            } catch (Exception ignored) {}
+        }).start();
     }
 
     public void stopMonitoring() { stopSelf(); }
