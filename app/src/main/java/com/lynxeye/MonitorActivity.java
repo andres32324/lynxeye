@@ -355,8 +355,19 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
                         lastFrameTime = System.currentTimeMillis();
                         boolean isConfig = (flags & 1) != 0;
                         if (isConfig && !configured && decoderSurface != null) {
+                            int split = -1;
+                            for (int i = 1; i < data.length - 3; i++) {
+                                if (data[i]==0 && data[i+1]==0 && data[i+2]==0 && data[i+3]==1) {
+                                    split = i; break;
+                                }
+                            }
                             MediaFormat format = MediaFormat.createVideoFormat("video/avc", 1280, 720);
-                            format.setByteBuffer("csd-0", ByteBuffer.wrap(data));
+                            if (split > 0) {
+                                format.setByteBuffer("csd-0", ByteBuffer.wrap(data, 0, split));
+                                format.setByteBuffer("csd-1", ByteBuffer.wrap(data, split, data.length - split));
+                            } else {
+                                format.setByteBuffer("csd-0", ByteBuffer.wrap(data));
+                            }
                             decoder.configure(format, decoderSurface, null, 0);
                             decoder.start();
                             configured = true;
@@ -370,7 +381,7 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
                                 inBuf.clear();
                                 inBuf.put(data);
                                 decoder.queueInputBuffer(inIndex, 0, data.length,
-                                        System.currentTimeMillis() * 1000, 0);
+                                        System.nanoTime() / 1000, 0);
                             }
                         }
                         MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
