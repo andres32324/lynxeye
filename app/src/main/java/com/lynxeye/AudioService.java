@@ -285,7 +285,7 @@ public class AudioService extends Service {
             sum += (long) s * s;
         }
         float rms = (float) Math.sqrt(sum / (chunk.length / 2.0));
-        float level = Math.min(1.0f, rms / 32768f);
+        float level = Math.min(1.0f, rms / 3000f);
         android.os.Handler h = new android.os.Handler(android.os.Looper.getMainLooper());
         h.post(() -> { if (callback != null) callback.onAudioLevel(level); });
     }
