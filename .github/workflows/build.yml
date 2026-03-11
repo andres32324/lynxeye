@@ -18,7 +18,7 @@ jobs:
           gradle-version: "8.2"
 
       - name: Build Debug APK
-        run: gradle assembleDebug --no-daemon --info 2>&1 | grep -E "R.java|videoSurface|namespace|symbol"
+        run: gradle assembleDebug --no-daemon
 
       - uses: actions/upload-artifact@v4
         with:
