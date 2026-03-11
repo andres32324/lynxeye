@@ -292,6 +292,7 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
                 if (audioMode == 1) sb.append("AUDIO_STEREO\n"); else sb.append("AUDIO_MONO\n");
                 sb.append("SR_").append(sampleRate).append("\n");
                 sb.append(videoEnabled ? "VIDEO_ON\n" : "VIDEO_OFF\n");
+                if (videoEnabled) sb.append("START_CAMERA\n");
                 cmd.getOutputStream().write(sb.toString().getBytes());
                 cmd.getOutputStream().flush();
                 cmd.close();
