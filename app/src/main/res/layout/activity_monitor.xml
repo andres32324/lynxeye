@@ -25,7 +25,7 @@
 
     <!-- Video Feed -->
     <TextView android:id="@+id/testView" android:layout_width="wrap_content" android:layout_height="wrap_content" android:visibility="gone"/>
-    <SurfaceView android:id="@+id/videoSurface"
+    <SurfaceView android:id="@+id/svVideo"
         android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1"
         android:background="#111111"/>
 
