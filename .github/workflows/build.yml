@@ -16,7 +16,9 @@ jobs:
           distribution: 'temurin'
 
       - name: Fix Gradle Wrapper
-        run: chmod +x gradlew
+        run: |
+          chmod +x gradlew
+          ./gradlew wrapper --gradle-version 8.2
 
       - name: Build Debug APK
         run: ./gradlew assembleDebug --no-daemon --rerun-tasks
