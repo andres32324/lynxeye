@@ -117,7 +117,7 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
         tvStatus       = findViewById(R.id.tvStatus);
         tvDeviceName   = findViewById(R.id.tvDeviceName);
         tvRecTime      = findViewById(R.id.tvRecTime);
-        videoSurface   = findViewById(R.id.svVideo);
+        videoSurface   = findViewById(R.id.videoSurface);
         btnRecord      = findViewById(R.id.btnRecord);
         btnSwitchCam   = findViewById(R.id.btnSwitchCam);
         btnScreenshot  = findViewById(R.id.btnScreenshot);
