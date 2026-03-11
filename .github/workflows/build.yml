@@ -1,9 +1,7 @@
 name: Build LynxEye
-
 on:
   push:
     branches: [ main ]
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -12,16 +10,15 @@ jobs:
 
       - uses: actions/setup-java@v4
         with:
-          java-version: '17'
-          distribution: 'temurin'
+          java-version: "17"
+          distribution: "temurin"
 
-      - name: Fix Gradle Wrapper
-        run: |
-          chmod +x gradlew
-          ./gradlew wrapper --gradle-version 8.2
+      - uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: "8.2"
 
       - name: Build Debug APK
-        run: ./gradlew assembleDebug --no-daemon --rerun-tasks
+        run: gradle assembleDebug --no-daemon
 
       - uses: actions/upload-artifact@v4
         with:
