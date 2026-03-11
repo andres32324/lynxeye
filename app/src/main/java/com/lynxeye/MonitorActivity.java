@@ -136,9 +136,7 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
         running = true;
         if (videoEnabled) {
             ivVideo.setBackgroundColor(0xFF111111);
-            startVideoReceiver();
             startVideoRenderer();
-            startVideoWatchdog();
         } else {
             ivVideo.setBackgroundColor(0xFF0A1A0A);
         }
@@ -296,6 +294,9 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
                 cmd.getOutputStream().write(sb.toString().getBytes());
                 cmd.getOutputStream().flush();
                 cmd.close();
+                Thread.sleep(400);
+                startVideoReceiver();
+                startVideoWatchdog();
             } catch (Exception ignored) {}
         }).start();
     }
