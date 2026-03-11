@@ -1,5 +1,6 @@
 package com.lynxeye;
 
+import com.lynxeye.R;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.media.MediaCodec;
