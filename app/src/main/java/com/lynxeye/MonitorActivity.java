@@ -2,6 +2,12 @@ package com.lynxeye;
 
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
+import android.media.MediaCodec;
+import android.media.MediaFormat;
+import android.view.SurfaceHolder;
+import android.view.SurfaceView;
+import java.io.BufferedInputStream;
+import java.util.concurrent.ArrayBlockingQueue;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
@@ -135,8 +141,7 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
 
         running = true;
         if (videoEnabled) {
-            ivVideo.setBackgroundColor(0xFF111111);
-            startVideoRenderer();
+            videoSurface.setBackgroundColor(0xFF111111);
         } else {
             ivVideo.setBackgroundColor(0xFF0A1A0A);
         }
@@ -532,4 +537,117 @@ public class MonitorActivity extends AppCompatActivity implements AudioService.C
         btnEq.setOnClickListener(v ->
                 layoutEq.setVisibility(layoutEq.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE));
     }
+    // ─── H264 Video Receiver ─────────────────────────────────
+    class VideoReceiver {
+        private final String host;
+        private final int port;
+        private android.view.Surface surface;
+        private volatile boolean running;
+        private java.net.Socket socket;
+        private java.io.DataInputStream in;
+        private MediaCodec decoder;
+        private final ArrayBlockingQueue<byte[]> frameQueue = new ArrayBlockingQueue<>(2);
+        private byte[] spspps;
+        private long pts = 0;
+        private static final long FRAME_TIME = 33333;
+
+        VideoReceiver(String host, int port, android.view.Surface surface) {
+            this.host = host; this.port = port; this.surface = surface;
+        }
+
+        void start() {
+            running = true;
+            new Thread(this::connectLoop, "VR-Connect").start();
+        }
+
+        void stop() {
+            running = false;
+            try { if (socket != null) socket.close(); } catch (Exception ignored) {}
+            try { if (decoder != null) { decoder.stop(); decoder.release(); } } catch (Exception ignored) {}
+        }
+
+        private void connectLoop() {
+            while (running) {
+                try {
+                    connect();
+                    startDecoder();
+                    Thread reader = new Thread(this::readerLoop, "VR-Reader");
+                    Thread dec = new Thread(this::decoderLoop, "VR-Decoder");
+                    reader.start(); dec.start();
+                    reader.join(); dec.join();
+                } catch (Exception e) {
+                    sleepRetry();
+                }
+            }
+        }
+
+        private void connect() throws Exception {
+            socket = new java.net.Socket();
+            socket.connect(new java.net.InetSocketAddress(host, port), 3000);
+            socket.setTcpNoDelay(true);
+            socket.setReceiveBufferSize(1024 * 1024);
+            in = new java.io.DataInputStream(new BufferedInputStream(socket.getInputStream()));
+        }
+
+        private void startDecoder() throws Exception {
+            decoder = MediaCodec.createDecoderByType("video/avc");
+            MediaFormat format = MediaFormat.createVideoFormat("video/avc", 1280, 720);
+            decoder.configure(format, surface, null, 0);
+            decoder.start();
+        }
+
+        private void readerLoop() {
+            try {
+                while (running && !socket.isClosed()) {
+                    int len = in.readInt();
+                    int flags = in.readUnsignedByte();
+                    byte[] data = new byte[len];
+                    in.readFully(data);
+                    lastFrameTime = System.currentTimeMillis();
+                    if (flags == 1) { spspps = data; offerFrame(data); continue; }
+                    if (spspps != null) offerFrame(data);
+                }
+            } catch (Exception ignored) {}
+        }
+
+        private void offerFrame(byte[] frame) {
+            if (!frameQueue.offer(frame)) { frameQueue.poll(); frameQueue.offer(frame); }
+        }
+
+        private void decoderLoop() {
+            MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
+            while (running) {
+                try {
+                    drainDecoder(info);
+                    byte[] frame = frameQueue.poll(500, java.util.concurrent.TimeUnit.MILLISECONDS);
+                    if (frame != null) queueDecoder(frame);
+                } catch (Exception ignored) {}
+            }
+        }
+
+        private void queueDecoder(byte[] data) {
+            try {
+                int index = decoder.dequeueInputBuffer(0);
+                if (index >= 0) {
+                    java.nio.ByteBuffer buf = decoder.getInputBuffer(index);
+                    buf.clear(); buf.put(data);
+                    decoder.queueInputBuffer(index, 0, data.length, pts, 0);
+                    pts += FRAME_TIME;
+                }
+            } catch (Exception ignored) {}
+        }
+
+        private void drainDecoder(MediaCodec.BufferInfo info) {
+            while (true) {
+                int out = decoder.dequeueOutputBuffer(info, 0);
+                if (out < 0) break;
+                decoder.releaseOutputBuffer(out, true);
+            }
+        }
+
+        private void sleepRetry() {
+            try { Thread.sleep(2000); } catch (Exception ignored) {}
+        }
+    }
+
 }
