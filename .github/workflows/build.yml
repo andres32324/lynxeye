@@ -14,12 +14,13 @@ jobs:
           distribution: "temurin"
 
       - name: Setup Gradle
-        run: |
-          chmod +x gradlew
-          ./gradlew wrapper
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: "8.2"
+          cache-disabled: true
 
       - name: Build Debug APK
-        run: ./gradlew clean assembleDebug --no-daemon --no-build-cache
+        run: gradle clean assembleDebug --no-daemon --no-build-cache
 
       - uses: actions/upload-artifact@v4
         with:
