@@ -33,7 +33,9 @@ dependencies {
 }
 
 afterEvaluate {
-    tasks.named("compileDebugJavaWithJavac").configure {
-        dependsOn("generateDebugRFile")
+    tasks.withType(com.android.build.gradle.tasks.ProcessAndroidResources).configureEach {
+        tasks.named("compileDebugJavaWithJavac").configure {
+            dependsOn(it)
+        }
     }
 }
