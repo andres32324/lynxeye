@@ -22,6 +22,10 @@ jobs:
       - name: Build Debug APK
         run: gradle clean assembleDebug --no-daemon --no-build-cache
 
+      - name: Check R symbols
+        if: always()
+        run: find app/build -name "R.txt" -exec grep -l "videoSurface" {} \; || echo "R.txt not found or missing symbol"
+
       - uses: actions/upload-artifact@v4
         with:
           name: lynxeye-debug
