@@ -13,15 +13,13 @@ jobs:
           java-version: "17"
           distribution: "temurin"
 
-      - uses: gradle/actions/setup-gradle@v3
-        with:
-          gradle-version: "8.2"
-
-      - name: Clear Gradle Cache
-        run: rm -rf ~/.gradle/caches ~/.gradle/wrapper app/build
+      - name: Setup Gradle
+        run: |
+          chmod +x gradlew
+          ./gradlew wrapper
 
       - name: Build Debug APK
-        run: gradle clean assembleDebug --no-daemon --no-build-cache --rerun-tasks
+        run: ./gradlew clean assembleDebug --no-daemon --no-build-cache
 
       - uses: actions/upload-artifact@v4
         with:
