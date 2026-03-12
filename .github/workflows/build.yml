@@ -20,7 +20,7 @@ jobs:
           cache-disabled: true
 
       - name: Build Debug APK
-        run: gradle clean assembleDebug --no-daemon --no-build-cache
+        run: gradle processDebugResources compileDebugJavaWithJavac assembleDebug --no-daemon --no-build-cache
 
       - name: Check R symbols
         if: always()

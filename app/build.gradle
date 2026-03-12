@@ -32,10 +32,4 @@ dependencies {
     implementation 'androidx.work:work-runtime:2.9.0'
 }
 
-afterEvaluate {
-    tasks.withType(com.android.build.gradle.tasks.ProcessAndroidResources).configureEach {
-        tasks.named("compileDebugJavaWithJavac").configure {
-            dependsOn(it)
-        }
-    }
 }
